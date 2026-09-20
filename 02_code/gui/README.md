@@ -54,7 +54,7 @@ Windows machine.
 ## Required packages
 
 ```r
-install.packages(c("shiny", "bslib", "DT"))
+install.packages(c("shiny", "DT"))
 ```
 
 These are listed in `Suggests` so the core package remains lightweight.
