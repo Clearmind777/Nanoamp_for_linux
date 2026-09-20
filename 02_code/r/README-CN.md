@@ -53,7 +53,7 @@ devtools::install("02_code/r")
 `minimap2` 和 `samtools` 必须在 `PATH` 中：
 
 Linux 和 Windows 下的详细安装与 PATH 配置说明见
-[INSTALL_DEPENDENCIES-CN.md](INSTALL_DEPENDENCIES-CN.md)。
+[inst/docs/INSTALL_DEPENDENCIES-CN.md](inst/docs/INSTALL_DEPENDENCIES-CN.md)。
 
 `nanoamp` 会优先使用 `03_dependence/<os>-<arch>/bin/` 中的工具，其次才是
 `PATH`。仓库已内置 Linux x86_64 的 minimap2 2.31；平台支持矩阵和 R 内后备

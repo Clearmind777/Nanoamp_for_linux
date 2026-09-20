@@ -55,7 +55,7 @@ devtools::install("02_code/r")
 `minimap2` and `samtools` must be available on `PATH`.
 
 Detailed installation and `PATH` configuration instructions for Linux and
-Windows are in [INSTALL_DEPENDENCIES.md](INSTALL_DEPENDENCIES.md).
+Windows are in [inst/docs/INSTALL_DEPENDENCIES.md](inst/docs/INSTALL_DEPENDENCIES.md).
 
 `nanoamp` prefers tools from `03_dependence/<os>-<arch>/bin/`, then falls back
 to `PATH`. The repository bundles minimap2 2.31 for Linux x86_64; the platform

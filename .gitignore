@@ -31,6 +31,8 @@ renv/library/
 tmp/
 04_results/*
 !04_results/README.md
+05_builds/*
+!05_builds/README.md
 *.tmp
 *.log
 
