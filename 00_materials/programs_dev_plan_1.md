@@ -375,16 +375,16 @@ Chr  Pos  Ref  Alt  DP  Ref_dp  Alt_dp  Freq  DP4  Seq  Filter_Status  Filter_Re
 
 给定：
 
-- 一组纳米孔 reads \(R = \{r_1, r_2, ..., r_n\}\)；
-- 一条目的序列 \(T\)；
-- 可选注释 \(A\)。
+- 一组纳米孔 reads $R = \{r_1, r_2, ..., r_n\}$；
+- 一条目的序列 $T$；
+- 可选注释 $A$。
 
 求：
 
-- 一组单倍型 \(H = \{h_1, h_2, ..., h_k\}\)；
-- 每个 \(h_j\) 的支持 reads 数 \(c_j\)；
-- 比例 \(p_j = c_j / \sum c_i\)；
-- 每个 \(h_j\) 相对 \(T\) 的差异和功能注释。
+- 一组单倍型 $H = \{h_1, h_2, ..., h_k\}$；
+- 每个 $h_j$ 的支持 reads 数 $c_j$；
+- 比例 $p_j = c_j / \sum c_i$；
+- 每个 $h_j$ 相对 $T$ 的差异和功能注释。
 
 难点在于：reads 带有测序错误，不能把每个不同的 raw read 当成一个单倍型。
 
