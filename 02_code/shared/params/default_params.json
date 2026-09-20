@@ -10,6 +10,7 @@
   "min_cluster_reads": 2,
   "max_msa_seqs": 100,
   "consensus_method": "decipher",
+  "aligner": "minimap2",
   "threads": 4,
   "keep_intermediates": true,
   "supported_modes": ["A", "B", "C"]

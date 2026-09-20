@@ -57,6 +57,11 @@ devtools::install("02_code/r")
 Detailed installation and `PATH` configuration instructions for Linux and
 Windows are in [INSTALL_DEPENDENCIES.md](INSTALL_DEPENDENCIES.md).
 
+`nanoamp` prefers tools from `03_dependence/<os>-<arch>/bin/`, then falls back
+to `PATH`. The repository bundles minimap2 2.31 for Linux x86_64; the platform
+support matrix and the R-native fallback are documented in
+`03_dependence/README.md`.
+
 ```bash
 minimap2 --version
 samtools --version
@@ -155,6 +160,7 @@ nanoamp_defaults()
 | `min_cluster_reads` | 2 | Mode B minimum cluster size |
 | `max_msa_seqs` | 100 | Maximum sequences per consensus alignment |
 | `consensus_method` | `"decipher"` | `"decipher"` or `"medoid"` |
+| `aligner` | `"minimap2"` | `"minimap2"` or `"r"` (R-native fallback) |
 | `threads` | 4 | Number of threads |
 | `keep_intermediates` | `TRUE` | Keep BAM and other intermediate files |
 
@@ -274,6 +280,22 @@ app <- nanoamp_gui_app()
 ```
 
 For Windows installer packaging with RInno, see `inst/windows/README.md`.
+
+### External tools and the R-native backend
+
+`aligner = "minimap2"` uses the bundled minimap2 binary when available.
+On Windows, ARM platforms, or any machine without minimap2, use:
+
+```r
+run_haplotype_analysis(..., aligner = "r")
+```
+
+The R-native backend uses Biostrings pairwise alignment and requires no
+external tool. It is slower and is intended for small and medium amplicons.
+
+`samtools` is optional: SAM -> BAM conversion uses `Rsamtools::asBam()` by
+default. Set `use_samtools = TRUE` only if you explicitly want the samtools
+path.
 
 ## RStudio workflow
 

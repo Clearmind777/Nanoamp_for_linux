@@ -81,6 +81,9 @@ GUI 规划、启动脚本和 Windows 打包说明见 `gui/README.md`。
 | R Shiny GUI | 初版开发中 |
 | Windows 安装包 | 计划使用 RInno |
 
+外部工具统一放在 `03_dependence/`；平台支持矩阵和 R 内后备方案见
+`03_dependence/README-CN.md`。
+
 ## 共享契约
 
 - `shared/params/default_params.json`：参数名与默认值；

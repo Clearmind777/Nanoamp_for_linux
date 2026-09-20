@@ -23,6 +23,10 @@
 #' @param min_cluster_reads Mode B minimum cluster size.
 #' @param max_msa_seqs Maximum number of sequences used for consensus alignment.
 #' @param consensus_method Mode B consensus method, `"decipher"` or `"medoid"`.
+#' @param aligner Alignment backend: `"minimap2"` (default) or `"r"` for the
+#'   R-native pairwise alignment fallback.
+#' @param use_samtools Use samtools for SAM/BAM conversion instead of
+#'   Rsamtools. Rsamtools is recommended and is used by default.
 #' @param threads Number of threads.
 #' @param keep_intermediates Keep BAM and other intermediate files.
 #' @param ref_label Optional reference label used in outputs.
@@ -39,6 +43,8 @@ run_haplotype_analysis <- function(reads, reference, outdir,
                                    min_cluster_reads = 2L,
                                    max_msa_seqs = 100L,
                                    consensus_method = "decipher",
+                                   aligner = c("minimap2", "r"),
+                                   use_samtools = FALSE,
                                    threads = 4L,
                                    keep_intermediates = TRUE,
                                    ref_label = NULL) {
@@ -50,6 +56,7 @@ run_haplotype_analysis <- function(reads, reference, outdir,
       min_reads = min_reads, min_freq = min_freq,
       min_identity = min_identity, min_ref_coverage = min_ref_coverage,
       homopolymer = homopolymer, strand_bias = strand_bias,
+      aligner = aligner, use_samtools = use_samtools,
       threads = threads, keep_intermediates = keep_intermediates,
       ref_label = ref_label
     ),
@@ -58,6 +65,7 @@ run_haplotype_analysis <- function(reads, reference, outdir,
       identity_cutoff = identity_cutoff, min_cluster_reads = min_cluster_reads,
       min_identity = min_identity, min_ref_coverage = min_ref_coverage,
       max_msa_seqs = max_msa_seqs, consensus_method = consensus_method,
+      aligner = aligner, use_samtools = use_samtools,
       threads = threads, keep_intermediates = keep_intermediates,
       ref_label = ref_label
     ),

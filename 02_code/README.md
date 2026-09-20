@@ -85,6 +85,9 @@ See `gui/README.md` for the GUI plan, launchers and Windows packaging notes.
 | R Shiny GUI | Initial version under development |
 | Windows installer | Planned via RInno |
 
+External tools are bundled under `03_dependence/`; see `03_dependence/README.md`
+for the platform support matrix and the R-native fallback.
+
 ## Shared contracts
 
 - `shared/params/default_params.json`: parameter names and defaults;

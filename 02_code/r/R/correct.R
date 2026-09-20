@@ -118,16 +118,20 @@ run_mode_a <- function(reads_path, reference_path, outdir,
                        min_reads = 3L, min_freq = 0.02,
                        min_identity = 0.90, min_ref_coverage = 0.90,
                        homopolymer = 4L, strand_bias = 0.90,
+                       aligner = c("minimap2", "r"), use_samtools = FALSE,
                        threads = 4L, keep_intermediates = TRUE,
                        ref_label = NULL) {
+  aligner <- match.arg(aligner, c("minimap2", "r"))
   outdir <- ensure_dir(outdir)
   ref <- read_reference(reference_path)
   n_total <- count_fastq_reads(reads_path)
   log_info("Mode A: ", basename(reads_path), " -> ", ref$name, " (", n_total, " reads)")
 
-  bam <- file.path(outdir, "alignments.bam")
-  align_reads(reads_path, reference_path, bam, threads = threads)
-  aln <- prepare_alignment_stats(parse_alignments(bam), ref$length)
+  prep <- prepare_alignment_data(
+    reads_path, reference_path, outdir,
+    aligner = aligner, threads = threads, use_samtools = use_samtools
+  )
+  aln <- prep$aln
   n_primary <- nrow(aln)
   if (n_primary == 0) stop("Mode A: no aligned reads", call. = FALSE)
 
@@ -138,7 +142,8 @@ run_mode_a <- function(reads_path, reference_path, outdir,
   disc <- discover_variants(
     kept, ref$sequence,
     min_reads = min_reads, min_freq = min_freq,
-    homopolymer = homopolymer, strand_bias = strand_bias
+    homopolymer = homopolymer, strand_bias = strand_bias,
+    read_vars = prep$read_vars
   )
   read_vars <- disc$read_vars
   retained <- if (nrow(read_vars) > 0) {
@@ -169,6 +174,7 @@ run_mode_a <- function(reads_path, reference_path, outdir,
 
   qc <- list(
     mode = "A",
+    aligner = aligner,
     reference_label = ref_label %||% ref$name,
     reference_length = ref$length,
     n_reads_total = n_total,
@@ -188,11 +194,12 @@ run_mode_a <- function(reads_path, reference_path, outdir,
   run_manifest(outdir, "A", list(
     top_n = top_n, min_reads = min_reads, min_freq = min_freq,
     min_identity = min_identity, min_ref_coverage = min_ref_coverage,
-    homopolymer = homopolymer, strand_bias = strand_bias, threads = threads
+    homopolymer = homopolymer, strand_bias = strand_bias,
+    aligner = aligner, threads = threads
   ), ref, qc, extra = list(reads_md5 = safe_md5(reads_path)))
 
-  if (!isTRUE(keep_intermediates)) {
-    unlink(c(bam, paste0(bam, ".bai"), paste0(bam, ".minimap2.log")))
+  if (!isTRUE(keep_intermediates) && !is.null(prep$bam)) {
+    unlink(c(prep$bam, paste0(prep$bam, ".bai"), paste0(prep$bam, ".minimap2.log")))
   }
   invisible(list(haplotypes = hap, variants = variants_tbl, qc = qc))
 }

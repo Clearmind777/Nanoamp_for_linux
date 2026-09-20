@@ -55,6 +55,10 @@ devtools::install("02_code/r")
 Linux 和 Windows 下的详细安装与 PATH 配置说明见
 [INSTALL_DEPENDENCIES-CN.md](INSTALL_DEPENDENCIES-CN.md)。
 
+`nanoamp` 会优先使用 `03_dependence/<os>-<arch>/bin/` 中的工具，其次才是
+`PATH`。仓库已内置 Linux x86_64 的 minimap2 2.31；平台支持矩阵和 R 内后备
+方案见 `03_dependence/README-CN.md`。
+
 ```bash
 minimap2 --version
 samtools --version
@@ -144,6 +148,7 @@ nanoamp_defaults()
 | `min_cluster_reads` | 2 | 方案 B 最小簇大小 |
 | `max_msa_seqs` | 100 | 共识比对最多使用多少条序列 |
 | `consensus_method` | `"decipher"` | `"decipher"` 或 `"medoid"` |
+| `aligner` | `"minimap2"` | `"minimap2"` 或 `"r"`（R 内后备） |
 | `threads` | 4 | 线程数 |
 | `keep_intermediates` | `TRUE` | 是否保留 BAM 等中间文件 |
 
@@ -262,6 +267,20 @@ app <- nanoamp_gui_app()
 ```
 
 使用 RInno 制作 Windows 安装包的说明见 `inst/windows/README.md`。
+
+### 外部工具与 R 内后端
+
+`aligner = "minimap2"` 会优先使用内置的 minimap2 二进制。
+Windows、ARM 或没有 minimap2 的机器上可以改用：
+
+```r
+run_haplotype_analysis(..., aligner = "r")
+```
+
+R 内后端使用 Biostrings 成对比对，不需要外部工具；速度较慢，适合中小扩增子。
+
+`samtools` 不是必需依赖：默认用 `Rsamtools::asBam()` 完成 SAM→BAM。
+只有显式设置 `use_samtools = TRUE` 才会调用 samtools。
 
 ## RStudio 使用流程
 

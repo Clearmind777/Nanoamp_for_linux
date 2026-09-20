@@ -80,6 +80,8 @@ nanoamp_gui_ui <- function() {
                             value = 2, min = 1),
         shiny::selectInput("consensus_method", "consensus_method (Mode B)",
                            choices = c("decipher", "medoid"), selected = "decipher"),
+        shiny::selectInput("aligner", "Alignment backend",
+                           choices = c("minimap2", "r"), selected = "minimap2"),
         shiny::numericInput("threads", "threads", value = 4, min = 1, max = 64),
         shiny::checkboxInput("keep_intermediates", "Keep BAM and intermediate files", value = TRUE),
         shiny::hr(),
@@ -139,6 +141,7 @@ nanoamp_gui_server <- function(input, output, session) {
             identity_cutoff = as.numeric(input$identity_cutoff),
             min_cluster_reads = as.integer(input$min_cluster_reads),
             consensus_method = input$consensus_method,
+            aligner = input$aligner,
             threads = as.integer(input$threads),
             keep_intermediates = isTRUE(input$keep_intermediates)
           )

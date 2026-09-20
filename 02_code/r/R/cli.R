@@ -38,6 +38,8 @@ cli_call_options <- function() {
                           help = "Mode B minimum cluster size [default 2]"),
     optparse::make_option(c("--consensus-method"), type = "character", default = "decipher",
                           help = "Mode B consensus method: decipher or medoid"),
+    optparse::make_option(c("--aligner"), type = "character", default = "minimap2",
+                          help = "Alignment backend: minimap2 or r"),
     optparse::make_option(c("--threads"), type = "integer", default = 4,
                           help = "Number of threads [default 4]"),
     optparse::make_option(c("--ref-label"), type = "character", default = NULL,
@@ -60,6 +62,7 @@ cli_batch_options <- function() {
     optparse::make_option(c("--identity-cutoff"), type = "double", default = 0.99),
     optparse::make_option(c("--min-cluster-reads"), type = "integer", default = 2),
     optparse::make_option(c("--consensus-method"), type = "character", default = "decipher"),
+    optparse::make_option(c("--aligner"), type = "character", default = "minimap2"),
     optparse::make_option(c("--no-intermediates"), action = "store_true", default = FALSE)
   )
 }
@@ -80,6 +83,7 @@ cli_cmd_call <- function(args) {
     identity_cutoff = opt$`identity-cutoff`,
     min_cluster_reads = opt$`min-cluster-reads`,
     consensus_method = opt$`consensus-method`,
+    aligner = opt$aligner,
     threads = opt$threads,
     keep_intermediates = !isTRUE(opt$`no-intermediates`),
     ref_label = opt$`ref-label`
@@ -114,6 +118,7 @@ cli_cmd_batch <- function(args) {
         min_identity = opt$`min-identity`, identity_cutoff = opt$`identity-cutoff`,
         min_cluster_reads = opt$`min-cluster-reads`,
         consensus_method = opt$`consensus-method`,
+        aligner = opt$aligner,
         keep_intermediates = !isTRUE(opt$`no-intermediates`),
         ref_label = if ("ref_label" %in% names(sheet)) sheet$ref_label[i] else NULL
       )
@@ -140,12 +145,19 @@ cli_cmd_doctor <- function(args) {
   cat("nanoamp version:", nanoamp_version(), "\n")
   cat("R version:", R.version.string, "\n")
   cat("Rscript:", file.path(R.home("bin"), "Rscript"), "\n")
+  cat("platform:", nanoamp_platform(), "\n")
+  dep <- nanoamp_dependence_dir()
+  cat("dependence directory:", if (is.null(dep)) "NOT FOUND" else dep, "\n")
   pkgs <- c("Biostrings", "IRanges", "Matrix", "Rsamtools", "ShortRead",
             "data.table", "optparse", "jsonlite", "readxl", "DECIPHER")
   for (p in pkgs) cat(sprintf("  %-12s %s\n", p, requireNamespace(p, quietly = TRUE)))
   for (tool in c("minimap2", "samtools")) {
-    path <- Sys.which(tool)
-    cat(sprintf("  %-12s %s\n", tool, if (nzchar(path)) path else "NOT FOUND"))
+    path <- nanoamp_tool_path(tool, required = FALSE)
+    if (is.null(path)) {
+      cat(sprintf("  %-12s NOT FOUND\n", tool))
+    } else {
+      cat(sprintf("  %-12s %s (%s)\n", tool, path, nanoamp_tool_version(tool, path)))
+    }
   }
   invisible(TRUE)
 }

@@ -2,24 +2,6 @@ project_root_test_root <- function() {
   normalizePath(testthat::test_path("..", "..", "..", ".."), mustWork = FALSE)
 }
 
-write_test_fastq <- function(seqs, path, prefix = "r") {
-  ids <- sprintf("@%s%04d", prefix, seq_along(seqs))
-  quals <- strrep("I", nchar(seqs))
-  lines <- as.vector(rbind(ids, seqs, "+", quals))
-  writeLines(lines, path)
-}
-
-write_test_ref <- function(seq, path) {
-  Biostrings::writeXStringSet(
-    Biostrings::DNAStringSet(stats::setNames(seq, "ref")), path
-  )
-}
-
-make_random_seq <- function(n, seed = 1L) {
-  set.seed(seed)
-  paste0(sample(c("A", "C", "G", "T"), n, replace = TRUE), collapse = "")
-}
-
 test_that("cs tag 可解析为 SNV / 插入 / 缺失", {
   v <- cs_to_variants(":5*ac:3+ag:2-tt", ref_start = 10)
   expect_equal(nrow(v), 3)
@@ -68,8 +50,8 @@ test_that("方案 C 能识别正链和反链精确匹配", {
 
 test_that("方案 A 能在合成数据中恢复参考与突变单倍型", {
   skip_if_not(
-    nzchar(Sys.which("minimap2")) && nzchar(Sys.which("samtools")),
-    "minimap2/samtools not available"
+    !is.null(nanoamp_tool_path("minimap2", required = FALSE)),
+    "minimap2 not available"
   )
   td <- tempfile("nanoamp_a_"); dir.create(td)
   ref <- make_random_seq(300, seed = 11)
@@ -93,8 +75,8 @@ test_that("方案 A 能在合成数据中恢复参考与突变单倍型", {
 
 test_that("方案 B 能对合成数据产生簇并计数", {
   skip_if_not(
-    nzchar(Sys.which("minimap2")) && nzchar(Sys.which("samtools")),
-    "minimap2/samtools not available"
+    !is.null(nanoamp_tool_path("minimap2", required = FALSE)),
+    "minimap2 not available"
   )
   td <- tempfile("nanoamp_b_"); dir.create(td)
   ref <- make_random_seq(300, seed = 22)

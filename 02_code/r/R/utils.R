@@ -47,13 +47,92 @@ require_packages <- function(pkgs, strict = TRUE) {
   invisible(missing)
 }
 
-check_external_tool <- function(tool) {
-  path <- Sys.which(tool)
-  if (!nzchar(path)) {
-    stop(sprintf("External command not found: %s. Please install it and add it to PATH.",
-                 tool), call. = FALSE)
+nanoamp_platform <- function() {
+  sys <- tolower(Sys.info()[["sysname"]])
+  os <- switch(sys, linux = "linux", windows = "windows", darwin = "macos", sys)
+  arch <- tolower(R.version$arch)
+  arch <- if (grepl("aarch64|arm64", arch)) {
+    "arm64"
+  } else if (grepl("x86_64|amd64", arch)) {
+    "x86_64"
+  } else {
+    arch
   }
-  unname(path)
+  paste(os, arch, sep = "-")
+}
+
+find_dependence_dir <- function(start = getwd()) {
+  p <- normalizePath(start, mustWork = FALSE)
+  repeat {
+    candidate <- file.path(p, "03_dependence")
+    if (dir.exists(candidate)) return(normalizePath(candidate, mustWork = TRUE))
+    parent <- dirname(p)
+    if (identical(parent, p)) break
+    p <- parent
+  }
+  installed <- system.file("dependence", package = "nanoamp")
+  if (nzchar(installed) && dir.exists(installed)) {
+    return(normalizePath(installed, mustWork = TRUE))
+  }
+  NULL
+}
+
+nanoamp_dependence_dir <- function() {
+  env <- Sys.getenv("NANOAMP_DEPENDENCE_DIR", unset = "")
+  if (nzchar(env) && dir.exists(env)) return(normalizePath(env, mustWork = TRUE))
+  find_dependence_dir()
+}
+
+nanoamp_tool_path <- function(tool, required = TRUE) {
+  exe <- if (.Platform$OS.type == "windows" && !grepl("\\.exe$", tool)) {
+    paste0(tool, ".exe")
+  } else {
+    tool
+  }
+  env_name <- paste0("NANOAMP_", toupper(gsub("[^A-Za-z0-9]", "_", tool)))
+  env <- Sys.getenv(env_name, unset = "")
+  if (nzchar(env) && file.exists(env)) return(normalizePath(env, mustWork = TRUE))
+
+  dep <- nanoamp_dependence_dir()
+  if (!is.null(dep)) {
+    candidate <- file.path(dep, nanoamp_platform(), "bin", exe)
+    if (file.exists(candidate)) return(normalizePath(candidate, mustWork = TRUE))
+  }
+  path <- Sys.which(tool)
+  if (nzchar(path)) return(unname(path))
+  if (required) {
+    stop(sprintf(
+      paste0(
+        "External tool '%s' not found.\n",
+        "Searched: %s and PATH.\n",
+        "Put the binary in 03_dependence/%s/bin/ or set %s."
+      ),
+      tool,
+      if (is.null(dep)) "<no 03_dependence directory>" else file.path(dep, nanoamp_platform(), "bin"),
+      nanoamp_platform(),
+      env_name
+    ), call. = FALSE)
+  }
+  NULL
+}
+
+nanoamp_tool_version <- function(tool, path = NULL) {
+  path <- path %||% nanoamp_tool_path(tool, required = FALSE)
+  if (is.null(path)) return(NA_character_)
+  out <- tryCatch(
+    system2(path, "--version", stdout = TRUE, stderr = TRUE),
+    error = function(e) character(0)
+  )
+  if (length(out) == 0) return(NA_character_)
+  trimws(out[1])
+}
+
+check_external_tool <- function(tool) {
+  path <- nanoamp_tool_path(tool, required = FALSE)
+  if (is.null(path)) {
+    nanoamp_tool_path(tool, required = TRUE)
+  }
+  path
 }
 
 write_tsv <- function(df, path) {
@@ -133,6 +212,7 @@ default_params <- function() {
     min_cluster_reads = 2L,
     max_msa_seqs = 100L,
     consensus_method = "decipher",
+    aligner = "minimap2",
     threads = 4L,
     keep_intermediates = TRUE
   )

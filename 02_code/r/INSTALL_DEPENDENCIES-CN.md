@@ -15,6 +15,26 @@
 
 方案 C（原始精确匹配）不需要 `minimap2` 和 `samtools`。
 
+## 1.1 内置工具与 R 内后备
+
+`nanoamp` 查找工具的顺序：
+
+1. 环境变量 `NANOAMP_MINIMAP2` / `NANOAMP_SAMTOOLS`；
+2. `03_dependence/<os>-<arch>/bin/`；
+3. `PATH`。
+
+仓库已在 `03_dependence/linux-x86_64/bin/` 内置 minimap2 2.31。完整平台矩阵见
+`03_dependence/README-CN.md`。
+
+没有 minimap2 二进制的平台（Windows、ARM）可以使用 R 内后端：
+
+```r
+run_haplotype_analysis(..., aligner = "r")
+```
+
+`samtools` 不是必需依赖：默认用 `Rsamtools::asBam()` 完成 SAM→BAM。
+只有显式设置 `use_samtools = TRUE` 时才走 samtools。
+
 ## 2. Linux
 
 ### 方式 A：conda / mamba（推荐）

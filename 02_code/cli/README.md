@@ -28,6 +28,7 @@ nanoamp help
 | `--identity-cutoff` | float | 0.99 | Mode B clustering identity cutoff |
 | `--min-cluster-reads` | int | 2 | Mode B minimum cluster size |
 | `--consensus-method` | string | `decipher` | `decipher` or `medoid` |
+| `--aligner` | string | `minimap2` | `minimap2` or `r` (R-native fallback) |
 | `--threads` | int | 4 | Number of threads |
 | `--ref-label` | string | reference name | Reference label in outputs |
 | `--no-intermediates` | flag | false | Do not keep BAM files |
@@ -61,7 +62,7 @@ After installing the R package, use one of:
 Rscript --vanilla -e "library(nanoamp); nanoamp_cli()" call --reads sample.fastq --reference target.fa --outdir results\sampleA
 
 :: Or use the shipped launcher
-02_code\r\inst\scripts\nanoamp.bat call --reads sample.fastq --reference target.fa --outdir results\sampleA
+02_code\cli\nanoamp.bat call --reads sample.fastq --reference target.fa --outdir results\sampleA
 ```
 
 You can also add a `nanoamp.cmd` wrapper to a directory on `PATH`:
@@ -76,6 +77,13 @@ Rscript --vanilla -e "library(nanoamp); nanoamp_cli()" %*
 `call` writes `haplotypes.tsv`, `haplotypes.fasta`, `variants.tsv`, `qc.tsv` and
 `run_manifest.json` into `--outdir`. Field definitions are in
 `02_code/shared/docs/output_schema.md`.
+
+## External tools
+
+`minimap2` is resolved from `03_dependence/<os>-<arch>/bin/` first, then from
+`PATH`. On platforms without a minimap2 binary, use `--aligner r` to run the
+R-native pairwise alignment backend. samtools is optional: SAM -> BAM is
+handled by `Rsamtools` by default.
 
 ## Exit codes
 

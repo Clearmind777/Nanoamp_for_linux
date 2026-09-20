@@ -162,38 +162,9 @@ pairwise_diffs <- function(query, ref) {
     Biostrings::DNAString(ref),
     type = "global", gapOpening = 5, gapExtension = 1
   )
-  q <- strsplit(as.character(Biostrings::aligned(Biostrings::pattern(pa))), "")[[1]]
-  s <- strsplit(as.character(Biostrings::aligned(Biostrings::subject(pa))), "")[[1]]
-  n <- length(q)
-  types <- character(0); poss <- integer(0); refs <- character(0); alts <- character(0)
-  ref_pos <- 1L
-  i <- 1L
-  while (i <= n) {
-    if (q[i] == s[i]) {
-      if (q[i] != "-") ref_pos <- ref_pos + 1L
-      i <- i + 1L
-    } else if (q[i] != "-" && s[i] != "-") {
-      types <- c(types, "snv"); poss <- c(poss, ref_pos)
-      refs <- c(refs, s[i]); alts <- c(alts, q[i])
-      ref_pos <- ref_pos + 1L; i <- i + 1L
-    } else if (q[i] == "-") {
-      start <- ref_pos; deleted <- character(0)
-      while (i <= n && q[i] == "-" && s[i] != "-") {
-        deleted <- c(deleted, s[i]); ref_pos <- ref_pos + 1L; i <- i + 1L
-      }
-      types <- c(types, "del"); poss <- c(poss, start)
-      refs <- c(refs, paste0(deleted, collapse = "")); alts <- c(alts, "")
-    } else {
-      anchor <- max(ref_pos - 1L, 0L); inserted <- character(0)
-      while (i <= n && s[i] == "-" && q[i] != "-") {
-        inserted <- c(inserted, q[i]); i <- i + 1L
-      }
-      types <- c(types, "ins"); poss <- c(poss, anchor)
-      refs <- c(refs, ""); alts <- c(alts, paste0(inserted, collapse = ""))
-    }
-  }
-  if (length(types) == 0) return(empty_ops())
-  data.table::data.table(type = types, pos = poss, ref = refs, alt = alts)
+  q <- as.character(Biostrings::aligned(Biostrings::pattern(pa)))
+  s <- as.character(Biostrings::aligned(Biostrings::subject(pa)))
+  alignment_to_ops(q, s)
 }
 
 run_mode_b <- function(reads_path, reference_path, outdir,
@@ -201,22 +172,27 @@ run_mode_b <- function(reads_path, reference_path, outdir,
                        identity_cutoff = 0.99, min_cluster_reads = 2L,
                        min_identity = 0.90, min_ref_coverage = 0.90,
                        max_msa_seqs = 100L, consensus_method = "decipher",
+                       aligner = c("minimap2", "r"), use_samtools = FALSE,
                        threads = 4L, keep_intermediates = TRUE,
                        ref_label = NULL) {
+  aligner <- match.arg(aligner, c("minimap2", "r"))
   outdir <- ensure_dir(outdir)
   ref <- read_reference(reference_path)
   n_total <- count_fastq_reads(reads_path)
   log_info("Mode B: ", basename(reads_path), " -> ", ref$name, " (", n_total, " reads)")
 
-  bam <- file.path(outdir, "alignments.bam")
-  align_reads(reads_path, reference_path, bam, threads = threads)
-  aln <- prepare_alignment_stats(parse_alignments(bam), ref$length)
+  prep <- prepare_alignment_data(
+    reads_path, reference_path, outdir,
+    aligner = aligner, threads = threads, use_samtools = use_samtools
+  )
+  aln <- prep$aln
   n_primary <- nrow(aln)
   if (n_primary == 0) stop("Mode B: no aligned reads", call. = FALSE)
   kept <- filter_alignment_reads(aln, min_identity, min_ref_coverage)
   if (nrow(kept) == 0) stop("Mode B: no reads left after filtering", call. = FALSE)
 
-  read_vars <- extract_read_variants(kept)
+  read_vars <- prep$read_vars
+  if (nrow(read_vars) > 0) read_vars <- read_vars[read_id %in% kept$read_id]
   seqs <- vapply(seq_len(nrow(kept)), function(i) {
     ops <- if (nrow(read_vars) > 0) read_vars[read_id == kept$read_id[i]] else empty_ops()
     apply_variants(ref$sequence, ops)
@@ -295,6 +271,7 @@ run_mode_b <- function(reads_path, reference_path, outdir,
 
   qc <- list(
     mode = "B",
+    aligner = aligner,
     reference_label = ref_label %||% ref$name,
     reference_length = ref$length,
     n_reads_total = n_total,
@@ -321,11 +298,11 @@ run_mode_b <- function(reads_path, reference_path, outdir,
     top_n = top_n, identity_cutoff = identity_cutoff,
     min_cluster_reads = min_cluster_reads, min_identity = min_identity,
     min_ref_coverage = min_ref_coverage, max_msa_seqs = max_msa_seqs,
-    consensus_method = consensus_method, threads = threads
+    consensus_method = consensus_method, aligner = aligner, threads = threads
   ), ref, qc, extra = list(reads_md5 = safe_md5(reads_path)))
 
-  if (!isTRUE(keep_intermediates)) {
-    unlink(c(bam, paste0(bam, ".bai"), paste0(bam, ".minimap2.log")))
+  if (!isTRUE(keep_intermediates) && !is.null(prep$bam)) {
+    unlink(c(prep$bam, paste0(prep$bam, ".bai"), paste0(prep$bam, ".minimap2.log")))
   }
   invisible(list(haplotypes = clusters, variants = var_rows, qc = qc))
 }

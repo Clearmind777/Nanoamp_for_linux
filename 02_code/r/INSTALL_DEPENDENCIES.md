@@ -15,6 +15,28 @@ the R packages required by `nanoamp` on Linux and Windows.
 
 Mode C (raw exact matching) does not need `minimap2` or `samtools`.
 
+## 1.1 Bundled tools and the R-native fallback
+
+`nanoamp` looks for tools in this order:
+
+1. `NANOAMP_MINIMAP2` / `NANOAMP_SAMTOOLS` environment variables;
+2. `03_dependence/<os>-<arch>/bin/`;
+3. `PATH`.
+
+The repository bundles minimap2 2.31 for Linux x86_64 under
+`03_dependence/linux-x86_64/bin/`. See `03_dependence/README.md` for the full
+platform matrix.
+
+On platforms without a minimap2 binary (Windows, ARM), use the R-native
+backend:
+
+```r
+run_haplotype_analysis(..., aligner = "r")
+```
+
+`samtools` is optional because `Rsamtools::asBam()` converts SAM to BAM by
+default. Use `use_samtools = TRUE` only if you need the samtools path.
+
 ## 2. Linux
 
 ### Option A: conda / mamba (recommended)

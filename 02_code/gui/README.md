@@ -20,7 +20,8 @@ The app provides:
 - run button with progress and captured log;
 - interactive haplotype and variant tables (DT);
 - download buttons for `haplotypes.tsv` and `variants.tsv`;
-- links to the output directory.
+- links to the output directory;
+- alignment backend selection (`minimap2` or the R-native `r` fallback).
 
 ## Windows launch
 
@@ -33,7 +34,7 @@ Rscript -e "library(nanoamp); nanoamp_gui()"
 Or use the launcher shipped with the package:
 
 ```bat
-02_code\r\inst\scripts\nanoamp-gui.bat
+02_code\gui\nanoamp-gui.bat
 ```
 
 The app starts a local Shiny server and opens the default browser.
@@ -50,6 +51,9 @@ For a double-clickable Windows installer:
 
 The RInno skeleton is in `inst/windows/build_installer.R`; it must be run on a
 Windows machine.
+
+External tools are resolved from `03_dependence/<os>-<arch>/bin/` first; see
+`03_dependence/README.md`.
 
 ## Required packages
 

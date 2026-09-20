@@ -20,6 +20,8 @@ run_haplotype_analysis(
   min_cluster_reads = 2L,
   max_msa_seqs = 100L,
   consensus_method = "decipher",
+  aligner = c("minimap2", "r"),
+  use_samtools = FALSE,
   threads = 4L,
   keep_intermediates = TRUE,
   ref_label = NULL
@@ -56,6 +58,12 @@ run_haplotype_analysis(
 \item{max_msa_seqs}{Maximum number of sequences used for consensus alignment.}
 
 \item{consensus_method}{Mode B consensus method, `"decipher"` or `"medoid"`.}
+
+\item{aligner}{Alignment backend: `"minimap2"` (default) or `"r"` for the
+R-native pairwise alignment fallback.}
+
+\item{use_samtools}{Use samtools for SAM/BAM conversion instead of
+Rsamtools. Rsamtools is recommended and is used by default.}
 
 \item{threads}{Number of threads.}
 

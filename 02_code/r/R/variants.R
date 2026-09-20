@@ -153,13 +153,22 @@ canonicalize_deletions <- function(vars, ref_seq, cov, min_reads, min_freq) {
 
 discover_variants <- function(aln, ref_seq,
                               min_reads = 3L, min_freq = 0.02,
-                              homopolymer = 4L, strand_bias = 0.90) {
+                              homopolymer = 4L, strand_bias = 0.90,
+                              read_vars = NULL) {
   ref_len <- nchar(ref_seq)
   cov <- compute_coverage(aln, ref_len)
   cov_plus <- compute_coverage(aln[strand == "+"], ref_len)
   cov_minus <- compute_coverage(aln[strand == "-"], ref_len)
 
-  vars <- extract_read_variants(aln)
+  if (is.null(read_vars)) {
+    vars <- extract_read_variants(aln)
+  } else {
+    vars <- data.table::as.data.table(read_vars)
+    if (nrow(vars) > 0) {
+      vars <- vars[read_id %in% aln$read_id]
+      vars[, key := variant_key(type, pos, ref, alt)]
+    }
+  }
   if (nrow(vars) == 0) {
     return(list(
       variants = data.table::data.table(),
