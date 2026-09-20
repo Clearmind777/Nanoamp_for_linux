@@ -1,0 +1,47 @@
+# Line-ending and binary policy.
+#
+# Shell scripts ship to bash (MSYS2/Cygwin/Git Bash) and MUST stay LF:
+# a checked-out copy with CRLF fails with
+#   "bash: ./script.sh: /usr/bin/bash^M: bad interpreter"
+
+* text=auto
+
+*.sh            text eol=lf
+*.bash          text eol=lf
+Makefile        text eol=lf
+*.mk            text eol=lf
+configure       text eol=lf
+
+# Windows batch / PowerShell launchers are consumed by Windows tools
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+*.ps1           text eol=crlf
+
+# R sources are read by R on every platform; LF keeps diffs stable
+*.R             text eol=lf
+*.r             text eol=lf
+*.Rmd           text eol=lf
+DESCRIPTION     text eol=lf
+NAMESPACE       text eol=lf
+
+# Data / docs
+*.tsv           text eol=lf
+*.md            text eol=lf
+*.json          text eol=lf
+*.fa            text eol=lf
+*.fasta         text eol=lf
+*.fastq         text eol=lf
+
+# Binaries - never touch
+*.exe           binary
+*.dll           binary
+*.ab1           binary
+*.xlsx          binary
+*.bam           binary
+*.bai           binary
+*.gz            binary
+*.bz2           binary
+*.zst           binary
+*.tar           binary
+*.png           binary
+*.pdf           binary
