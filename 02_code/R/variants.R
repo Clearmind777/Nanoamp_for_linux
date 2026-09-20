@@ -82,6 +82,75 @@ compute_coverage <- function(aln, ref_len) {
   out
 }
 
+canonicalize_deletions <- function(vars, ref_seq, cov, min_reads, min_freq) {
+  ref_len <- nchar(ref_seq)
+  if (nrow(vars) == 0 || !any(vars$type == "del")) return(vars)
+  dels <- vars[vars$type == "del"]
+  starts <- dels$pos
+  ends <- dels$pos + nchar(dels$ref) - 1L
+  ok <- !is.na(starts) & !is.na(ends) & starts >= 1L & ends <= ref_len & ends >= starts
+  if (!any(ok)) return(vars)
+
+  pos_support <- integer(ref_len)
+  for (i in which(ok)) {
+    pos_support[starts[i]:ends[i]] <- pos_support[starts[i]:ends[i]] + 1L
+  }
+  freq <- pos_support / pmax(cov, 1L)
+  mask <- pos_support >= min_reads & freq >= min_freq
+  if (!any(mask)) return(vars)
+
+  r <- rle(mask)
+  ends_r <- cumsum(r$lengths)
+  starts_r <- ends_r - r$lengths + 1L
+  regions <- data.table::data.table(start = starts_r[r$values], end = ends_r[r$values])
+  regions <- regions[order(start)]
+  merged <- list()
+  cur <- as.list(regions[1])
+  if (nrow(regions) > 1) {
+    for (i in 2:nrow(regions)) {
+      if (regions$start[i] - cur$end <= 3L) {
+        cur$end <- regions$end[i]
+      } else {
+        merged[[length(merged) + 1L]] <- cur
+        cur <- as.list(regions[i])
+      }
+    }
+  }
+  merged[[length(merged) + 1L]] <- cur
+  regions <- data.table::rbindlist(lapply(merged, data.table::as.data.table))
+  regions[, ref := substring(ref_seq, start, end)]
+  regions[, len := end - start + 1L]
+  regions[, key := variant_key("delregion", start, ref, "")]
+
+  vars <- data.table::copy(vars)
+  vars[, region_key := NA_character_]
+  for (i in which(vars$type == "del")) {
+    p <- vars$pos[i]
+    L <- nchar(vars$ref[i])
+    if (is.na(p) || L < 1L) next
+    ds <- p
+    de <- p + L - 1L
+    for (j in seq_len(nrow(regions))) {
+      ov <- min(de, regions$end[j]) - max(ds, regions$start[j]) + 1L
+      if (ov > 0L && ov >= 0.5 * regions$len[j]) {
+        vars$region_key[i] <- regions$key[j]
+        break
+      }
+    }
+  }
+  mapped <- !is.na(vars$region_key)
+  if (any(mapped)) {
+    reg <- regions[match(vars$region_key[mapped], regions$key)]
+    vars$type[mapped] <- "delregion"
+    vars$pos[mapped] <- reg$start
+    vars$ref[mapped] <- reg$ref
+    vars$alt[mapped] <- ""
+  }
+  vars[, region_key := NULL]
+  vars[, key := variant_key(type, pos, ref, alt)]
+  unique(vars, by = c("read_id", "key"))
+}
+
 discover_variants <- function(aln, ref_seq,
                               min_reads = 3L, min_freq = 0.02,
                               homopolymer = 4L, strand_bias = 0.90) {
@@ -96,9 +165,11 @@ discover_variants <- function(aln, ref_seq,
       variants = data.table::data.table(),
       pass_keys = character(0),
       coverage = cov,
+      read_vars = vars,
       qc_extra = list(n_variant_reads = 0L, n_raw_variants = 0L)
     ))
   }
+  vars <- canonicalize_deletions(vars, ref_seq, cov, min_reads, min_freq)
 
   agg <- vars[, .(
     support = .N,
@@ -152,6 +223,7 @@ discover_variants <- function(aln, ref_seq,
     variants = agg[],
     pass_keys = agg[Filter_Status == "PASS", key],
     coverage = cov,
+    read_vars = vars,
     qc_extra = list(
       n_variant_reads = data.table::uniqueN(vars$read_id),
       n_raw_variants = nrow(agg)

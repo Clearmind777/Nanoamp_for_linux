@@ -72,6 +72,7 @@ format_op <- function(type, pos, ref, alt) {
       snv = sprintf("%d%s>%s", pos[i], ref[i], alt[i]),
       ins = sprintf("%dins%s", pos[i], alt[i]),
       del = sprintf("%ddel%s", pos[i], ref[i]),
+      delregion = sprintf("%ddel%s", pos[i], ref[i]),
       sprintf("%s%d%s>%s", type[i], pos[i], ref[i], alt[i])
     )
   }
@@ -96,7 +97,7 @@ variant_homopolymer_run <- function(ref_seq, type, pos, ref) {
   if (type == "ins") {
     return(max(homopolymer_run(ref_seq, p), homopolymer_run(ref_seq, min(p + 1L, L))))
   }
-  if (type == "del") {
+  if (type %in% c("del", "delregion")) {
     span <- max(nchar(ref), 1L)
     positions <- seq.int(max(1L, p), min(L, p + span))
     return(max(vapply(positions, function(x) homopolymer_run(ref_seq, x), integer(1))))

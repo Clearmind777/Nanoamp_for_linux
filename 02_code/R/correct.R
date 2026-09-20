@@ -74,7 +74,7 @@ build_haplotype_table <- function(counts, ref_seq) {
       is_reference = !nzchar(sig),
       n_snv = sum(ops$type == "snv"),
       n_ins = sum(ops$type == "ins"),
-      n_del = sum(ops$type == "del"),
+      n_del = sum(ops$type %in% c("del", "delregion")),
       length = nchar(seq),
       variants = if (nrow(ops) == 0) "." else paste(
         format_op(ops$type, ops$pos, ops$ref, ops$alt), collapse = ";"
@@ -140,7 +140,7 @@ run_mode_a <- function(reads_path, reference_path, outdir,
     min_reads = min_reads, min_freq = min_freq,
     homopolymer = homopolymer, strand_bias = strand_bias
   )
-  read_vars <- extract_read_variants(kept)
+  read_vars <- disc$read_vars
   retained <- if (nrow(read_vars) > 0) {
     read_vars[key %in% disc$pass_keys]
   } else {
