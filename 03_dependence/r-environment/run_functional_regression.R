@@ -40,8 +40,16 @@ cat("library :", paste(.libPaths(), collapse = " | "), "\n")
 cat("script  :", script, "\n")
 cat("args    :", paste(args, collapse = " "), "\n\n")
 
+# The package script calls library() on its dependencies directly, so the
+# dedicated library must be visible to the child process. --vanilla would skip
+# Rprofile.site and hide it, so pass the library through R_LIBS instead and
+# launch with --no-save --no-restore.
+old <- Sys.getenv("R_LIBS", unset = NA)
+Sys.setenv(R_LIBS = paste(.libPaths(), collapse = .Platform$path.sep))
+on.exit(if (is.na(old)) Sys.unsetenv("R_LIBS") else Sys.setenv(R_LIBS = old), add = TRUE)
+
 status <- system2(
   file.path(R.home("bin"), "Rscript"),
-  c("--vanilla", shQuote(script), args)
+  c("--no-save", "--no-restore", shQuote(script), args)
 )
 quit(status = status)
