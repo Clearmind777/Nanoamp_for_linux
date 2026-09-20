@@ -114,6 +114,25 @@ Rscript 03_dependence/r-environment/run_functional_regression.R \
 See `03_dependence/r-environment/README.md` for a from-scratch Windows
 environment setup (R install, mirrors, dependency installation).
 
+## Offline / air-gapped installation
+
+To provision a machine with no network, build a pinned bundle of every upstream
+installer (R, all 109 R package binaries, the MSYS2 toolchain for rebuilds,
+minimap2 source) and install from it:
+
+```bash
+# on a machine with a network
+Rscript 03_dependence/offline-bundle/fetch_offline_bundle.R
+
+# on the offline machine
+pwsh -File 03_dependence/offline-bundle/install_offline.ps1
+```
+
+The 291 MB bundle lands in `dist/`, which is git-ignored: the repository keeps
+the reproducible recipe and hashes, not the binaries. Rationale and the
+self-contained alternatives (USB payload, GitHub release assets) are in
+`03_dependence/offline-bundle/README.md`.
+
 ## Common commands
 
 ```bash

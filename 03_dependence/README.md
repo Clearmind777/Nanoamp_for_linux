@@ -78,6 +78,23 @@ The toolchain itself is not committed (too large); the repository commits the
 two scripts above plus the resulting binary and its provenance.
 See `windows-x86_64/README.md` for the pinned versions, flags and hashes.
 
+## Offline / air-gapped installation
+
+Every upstream installer can be pre-positioned as a pinned, integrity-checked
+bundle so a machine with no network can be provisioned:
+
+```bash
+# with a network
+Rscript 03_dependence/offline-bundle/fetch_offline_bundle.R
+# without a network
+pwsh -File 03_dependence/offline-bundle/install_offline.ps1
+```
+
+The bundle (291 MB: R installer, 109 R package binaries, MSYS2 toolchain,
+minimap2 source) is written to the git-ignored `dist/`. Why the binaries are
+not committed, and the USB / release-asset alternatives, are documented in
+`offline-bundle/README.md`.
+
 ## R-native fallback
 
 `run_haplotype_analysis(..., aligner = "r")` uses Biostrings pairwise
