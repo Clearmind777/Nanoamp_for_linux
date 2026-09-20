@@ -5,8 +5,11 @@
 
 > **本仓库是仅面向 Linux 的变体。** 内置工具、CI 和文档都以 Linux 为目标。
 > 所有 Windows 专属内容（预编译的 `minimap2.exe`、MSYS2 工具链与编译脚本、
-> RInno 安装包骨架、R 环境脚本以及离线安装包）都放在姊妹仓库
-> `a_09_18_26_mapping_programs_dev_for_win` 中。
+> RInno 安装包骨架、R 环境脚本以及离线安装包）都放在独立的 Windows 仓库中
+> （预期名称 `a_09_18_26_mapping_programs_dev_for_win`，不在当前检出中）。
+>
+> 本仓库发布为 `Clearmind777/Nanoamp_for_linux`；原跨平台开发仓库是
+> `Clearmind777/nanoamp`。
 
 ## 仓库结构
 
@@ -17,8 +20,8 @@
   r/              nanoamp R 包
   cli/            独立 R CLI 入口和启动器
   gui/            独立 R Shiny GUI 入口和启动器
-  shared/         跨语言参数与输出契约
-03_dependence/    随项目分发的外部工具与获取说明
+  shared/         共享参数、输出与接口契约
+03_dependence/    随项目分发的外部工具与 Linux x86_64 离线运行时
 04_results/       运行结果（除 README 外 Git 忽略）
 05_builds/        R 构建包和 R CMD check 产物（Git 忽略）
 tmp/              临时目录（Git 忽略）
@@ -37,7 +40,8 @@ tmp/              临时目录（Git 忽略）
 ./03_dependence/linux-x86_64/nanoamp-gui
 ```
 
-首次运行会自动重组运行时、校验校验和、解压 R 4.4.3 和全部 R 包依赖，然后执行分析。
+运行时以 7 个分片保存，总计约 573MB。首次运行会自动重组分片、校验 SHA256、
+解压 R 4.4.3 和全部 R 包依赖、执行 `conda-unpack`，然后运行分析。
 
 ### 使用已有 R 环境
 
@@ -86,6 +90,7 @@ res$haplotypes
 | `02_code/cli/README.md` | CLI 契约与启动器 |
 | `02_code/gui/README.md` | GUI 功能与启动器 |
 | `03_dependence/README-CN.md` | 内置工具与平台支持矩阵 |
+| `03_dependence/linux-x86_64/README.md` | 离线 R 运行时：结构、用法与重建 |
 | `00_materials/README.md` | 规划文档与工作报告索引 |
 
 ## 外部工具
@@ -100,19 +105,47 @@ res$haplotypes
 Linux ARM64 和 macOS 没有内置二进制，获取方式和平台矩阵见
 `03_dependence/README-CN.md`。
 
-这些平台可以使用 R 内后端：
+Linux x86_64 还内置了可移植的 R 4.4.3 运行时（位于
+`03_dependence/linux-x86_64/`），所以 CLI 和 GUI 不需要另外安装 R。
+
+没有内置二进制的平台（例如 ARM）可以使用 R 内后端：
 
 ```r
 run_haplotype_analysis(..., aligner = "r")
 ```
 
-samtools 不是必需依赖：默认用 `Rsamtools::asBam()` 完成 SAM→BAM。
+samtools 不是必需依赖：默认用 `Rsamtools::asBam()` 完成 SAM→BAM，
+因此任何平台都不需要 samtools。
+
+## 运行测试
+
+```bash
+# 单元测试（有内置/已安装的 minimap2 时会使用它）
+make test
+
+# 等价命令
+Rscript -e 'devtools::test("02_code/r", reporter = "summary", stop_on_failure = TRUE)'
+
+# 构建并 R CMD check，产物写入 05_builds/r
+make check
+
+# 基于 01_data/ 真实数据的功能回归
+Rscript 02_code/r/inst/scripts/run_functional_tests.R \
+  --outdir 04_results/r/test_run --modes A,B,C --threads 4
+```
+
+`01_data/ln_test_data/` 的符号链接层在 Linux 下会以真实 symlink 检出。
+如果目录是从 Windows 检出复制过来的、变成了普通文件，可以重建：
+
+```bash
+Rscript 02_code/r/inst/scripts/prepare_test_data.R
+```
 
 ## 常用命令
 
 ```bash
 make install     # 安装 R 包
-make test        # 运行 testthat 测试
+make test        # 运行 testthat 测试，失败时返回非零
 make check       # 构建并 R CMD check
 make cli         # 运行 nanoamp doctor
 make gui         # 启动 Shiny GUI

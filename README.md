@@ -5,11 +5,15 @@ and a target sequence, it corrects sequencing errors, reconstructs haplotypes,
 and reports the most abundant sequences with counts and proportions.
 
 > **This repository is the Linux-only variant.** Bundled tools, CI and
-> documentation all target Linux. Every piece of Windows-specific material
-> (prebuilt `minimap2.exe`, the MSYS2 toolchain and build scripts, the RInno
-> installer skeleton, the R environment scripts and the offline installer
-> bundle) lives in the sister repository
-> `a_09_18_26_mapping_programs_dev_for_win`.
+> documentation all target Linux. Windows-specific material (prebuilt
+> `minimap2.exe`, the MSYS2 toolchain and build scripts, the RInno installer
+> skeleton, the R environment scripts and the offline installer bundle) lives
+> in a separate Windows repository (intended name:
+> `a_09_18_26_mapping_programs_dev_for_win`), which is not part of this
+> checkout.
+>
+> This repository is published as `Clearmind777/Nanoamp_for_linux`. The
+> original cross-platform development repository is `Clearmind777/nanoamp`.
 
 ## Repository layout
 
@@ -20,8 +24,8 @@ and reports the most abundant sequences with counts and proportions.
   r/              nanoamp R package
   cli/            standalone R CLI entry points and launchers
   gui/            standalone R Shiny GUI entry points and launchers
-  shared/         cross-language parameter and output contracts
-03_dependence/    bundled external tools and fetch instructions
+  shared/         shared parameter, output and interface contracts
+03_dependence/    bundled external tools and the Linux x86_64 offline runtime
 04_results/       run outputs (Git ignores everything except README)
 05_builds/        R tarballs and R CMD check outputs (Git ignored)
 tmp/              scratch space (Git ignored)
@@ -40,8 +44,9 @@ tmp/              scratch space (Git ignored)
 ./03_dependence/linux-x86_64/nanoamp-gui
 ```
 
-The first run reassembles the split runtime bundle, verifies its checksum,
-extracts R 4.4.3 and all R package dependencies, and runs the analysis.
+The runtime is stored as 7 split parts (about 573 MB in total). The first run
+reassembles them, verifies the SHA256, extracts R 4.4.3 and all R package
+dependencies, runs `conda-unpack`, and then executes the analysis.
 
 ### Use an existing R installation
 
@@ -90,6 +95,7 @@ res$haplotypes
 | `02_code/cli/README.md` | CLI contract and launchers |
 | `02_code/gui/README.md` | GUI features and launchers |
 | `03_dependence/README.md` | bundled tools and platform support matrix |
+| `03_dependence/linux-x86_64/README.md` | offline R runtime: layout, usage and rebuild |
 | `00_materials/README.md` | planning documents and work reports |
 
 ## External tools
@@ -104,7 +110,11 @@ The repository bundles minimap2 2.31 for **Linux x86_64**, plus an optional
 samtools 1.12 fallback. Linux ARM64 and macOS have no bundled binary; the fetch
 recipes and the platform matrix are in `03_dependence/README.md`.
 
-On platforms without a bundled binary (ARM), use the R-native backend:
+For Linux x86_64 the repository also bundles a portable R 4.4.3 runtime under
+`03_dependence/linux-x86_64/`, so the CLI and GUI can run without installing R.
+
+On platforms without a bundled binary (for example ARM), use the R-native
+backend:
 
 ```r
 run_haplotype_analysis(..., aligner = "r")
@@ -117,7 +127,10 @@ default, so no samtools binary is needed on any platform.
 
 ```bash
 # unit tests (uses the bundled/installed minimap2 when available)
-Rscript -e 'devtools::test("02_code/r", reporter = "summary")'
+make test
+
+# equivalent direct command
+Rscript -e 'devtools::test("02_code/r", reporter = "summary", stop_on_failure = TRUE)'
 
 # build and R CMD check into 05_builds/r
 make check
@@ -128,13 +141,18 @@ Rscript 02_code/r/inst/scripts/run_functional_tests.R \
 ```
 
 The normalised symlink layer in `01_data/ln_test_data/` is checked out as real
-symlinks on Linux, so no repair step is needed before running the tests.
+symlinks on Linux. If the tree was copied from a Windows checkout and contains
+regular files instead, rebuild it with:
+
+```bash
+Rscript 02_code/r/inst/scripts/prepare_test_data.R
+```
 
 ## Common commands
 
 ```bash
 make install     # install the R package
-make test        # run testthat tests
+make test        # run testthat tests and fail on errors
 make check       # build and R CMD check
 make cli         # run `nanoamp doctor`
 make gui         # launch the Shiny GUI
