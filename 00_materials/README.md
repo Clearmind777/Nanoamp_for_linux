@@ -11,7 +11,8 @@ Planning documents and work reports for the nanoamp project.
     |-- work_report.2.md       # directory refactor and DECIPHER mode B
     |-- work_report.3.md       # R package, tutorial and CLI
     |-- work_report.4.md       # R-only route, dependency guide and GUI v1
-    `-- work_report.5.md       # bundled dependencies and cross-platform compatibility
+    |-- work_report.5.md       # bundled dependencies and cross-platform compatibility
+    `-- work_report.6.md       # GitHub remote, Windows minimap2 build, local R regression
 ```
 
 Start with `programs_dev_info.md` for the original request and

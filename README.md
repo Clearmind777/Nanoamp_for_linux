@@ -67,6 +67,8 @@ res$haplotypes
 | `02_code/cli/README.md` | CLI contract and launchers |
 | `02_code/gui/README.md` | GUI features and Windows packaging |
 | `03_dependence/README.md` | bundled tools and platform support matrix |
+| `03_dependence/windows-x86_64/README.md` | Windows source build of minimap2 |
+| `03_dependence/r-environment/README.md` | R environment setup (Windows) |
 | `00_materials/README.md` | planning documents and work reports |
 
 ## External tools
@@ -77,15 +79,37 @@ res$haplotypes
 2. `03_dependence/<os>-<arch>/bin/`;
 3. `PATH`.
 
-The repository bundles minimap2 2.31 for Linux x86_64. On platforms without an
-official minimap2 binary (Windows, ARM), use the R-native backend:
+The repository bundles minimap2 2.31 for **Linux x86_64 and Windows x86_64**.
+The Windows binary is built from upstream source in this repository and is
+statically linked, so it needs no MSYS2, Cygwin, conda or WSL at runtime:
+
+```powershell
+pwsh -File 03_dependence/windows-x86_64/install_msys2_toolchain.ps1  # toolchain
+bash 03_dependence/windows-x86_64/build_minimap2.sh                  # build
+```
+
+On platforms without a bundled binary (ARM), use the R-native backend:
 
 ```r
 run_haplotype_analysis(..., aligner = "r")
 ```
 
 samtools is optional: SAM to BAM conversion uses `Rsamtools::asBam()` by
-default.
+default, so no samtools binary is needed on any platform.
+
+## Running the test suite
+
+```bash
+# unit tests (uses the bundled/installed minimap2 when available)
+Rscript 03_dependence/r-environment/run_tests.R
+
+# functional regression over the real datasets in 01_data/
+Rscript 03_dependence/r-environment/run_functional_regression.R \
+  --outdir 04_results/r/test_run_win --modes A,B,C --threads 4
+```
+
+See `03_dependence/r-environment/README.md` for a from-scratch Windows
+environment setup (R install, mirrors, dependency installation).
 
 ## Common commands
 
