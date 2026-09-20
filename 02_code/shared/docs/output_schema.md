@@ -1,6 +1,6 @@
 # 输出文件 schema（跨语言契约）
 
-所有实现（R / Python / CLI / GUI）都应在 `--outdir` 下生成以下文件，字段名保持一致。
+所有实现（R 核心库、CLI、GUI）都应在 `--outdir` 下生成以下文件，字段名保持一致。
 
 ## haplotypes.tsv
 

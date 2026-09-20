@@ -1,35 +1,35 @@
 # 02_code: Source Code
 
-This directory is organized as "shared contracts + per-language implementations
-+ per-delivery front ends". The R implementation is complete; Python, CLI and
-GUI have reserved locations.
+This directory contains the R package, the R-based command line interface and
+the development area for an R-based Windows GUI.
 
 ```text
 02_code/
 |-- shared/                 # Cross-language parameters and output schema
 |   |-- params/default_params.json
 |   `-- docs/output_schema.md
-|-- r/                      # R package (available)
+|-- r/                      # nanoamp R package (available)
 |   |-- R/
 |   |-- inst/scripts/
 |   |-- tests/
 |   |-- DESCRIPTION
 |   `-- README.md / README-CN.md
-|-- python/                 # Python implementation (placeholder)
-|-- cli/                    # CLI contract and wrappers
-`-- gui/                    # Windows GUI (planned)
+|-- cli/                    # CLI contract and wrappers (R based)
+`-- gui/                    # R Shiny GUI (in development)
 ```
+
+The Python implementation was cancelled; all current development targets R.
 
 ## Design principles
 
-1. **One algorithm, thin front ends**: GUI and Web call the CLI or the core
-   library instead of reimplementing the analysis.
+1. **One algorithm, thin front ends**: CLI and GUI call the `nanoamp` R package
+   instead of reimplementing the analysis.
 2. **Shared contracts**: parameter names, defaults and output columns are
-   defined once in `shared/` and reused by every implementation.
+   defined once in `shared/`.
 3. **Data and code are separate**: test data lives in `01_data/`; run outputs
-   live in `04_results/<language>/`.
-4. **Each language is self-contained**: the R package is `02_code/r`; the
-   future Python package will live in `02_code/python`.
+   live in `04_results/r/`.
+4. **Windows first for the GUI**: the GUI is built with Shiny so it runs on
+   Windows, Linux and macOS, and can be packaged with RInno later.
 
 ## R package quick start
 
@@ -61,20 +61,33 @@ res <- run_haplotype_analysis(
 res$haplotypes
 ```
 
-Full tutorial: `02_code/r/README.md` (English) and `02_code/r/README-CN.md`
-(Chinese).
+## GUI
+
+```r
+library(nanoamp)
+nanoamp_gui()
+```
+
+On Windows, after installing the package, double-click or run:
+
+```bat
+Rscript -e "library(nanoamp); nanoamp_gui()"
+```
+
+See `gui/README.md` for the GUI plan, launchers and Windows packaging notes.
 
 ## Status
 
 | Component | Status |
 |---|---|
 | R package | Implemented and verified with `R CMD check` (`Status: OK`) |
-| CLI based on R | Implemented (`nanoamp call` / `batch` / `doctor`) |
-| Python package | Placeholder |
-| Windows GUI | Planned |
+| R-based CLI | Implemented (`nanoamp call` / `batch` / `doctor`) |
+| R Shiny GUI | Initial version under development |
+| Windows installer | Planned via RInno |
 
 ## Shared contracts
 
 - `shared/params/default_params.json`: parameter names and defaults;
 - `shared/docs/output_schema.md`: output file and column definitions;
-- `cli/README.md`: CLI command contract.
+- `cli/README.md`: CLI command contract;
+- `gui/README.md`: GUI behaviour and deployment plan.

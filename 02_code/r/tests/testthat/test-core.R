@@ -1,5 +1,3 @@
-context("核心算法单元测试")
-
 project_root_test_root <- function() {
   normalizePath(testthat::test_path("..", "..", "..", ".."), mustWork = FALSE)
 }
@@ -69,6 +67,10 @@ test_that("方案 C 能识别正链和反链精确匹配", {
 })
 
 test_that("方案 A 能在合成数据中恢复参考与突变单倍型", {
+  skip_if_not(
+    nzchar(Sys.which("minimap2")) && nzchar(Sys.which("samtools")),
+    "minimap2/samtools not available"
+  )
   td <- tempfile("nanoamp_a_"); dir.create(td)
   ref <- make_random_seq(300, seed = 11)
   mut <- ref
@@ -90,6 +92,10 @@ test_that("方案 A 能在合成数据中恢复参考与突变单倍型", {
 })
 
 test_that("方案 B 能对合成数据产生簇并计数", {
+  skip_if_not(
+    nzchar(Sys.which("minimap2")) && nzchar(Sys.which("samtools")),
+    "minimap2/samtools not available"
+  )
   td <- tempfile("nanoamp_b_"); dir.create(td)
   ref <- make_random_seq(300, seed = 22)
   mut <- ref

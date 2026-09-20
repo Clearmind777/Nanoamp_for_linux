@@ -1,0 +1,25 @@
+name: R-CMD-check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  R-CMD-check:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          dependencies: '"hard"'
+          extra-packages: any::rcmdcheck, any::testthat
+
+      - name: Check package
+        run: Rscript -e 'rcmdcheck::rcmdcheck("02_code/r", args = "--no-manual", error_on = "error")'

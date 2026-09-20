@@ -1,28 +1,60 @@
-# Windows GUI（待开发）
+# Windows GUI (R Shiny)
 
-GUI 的目标用户是教授和实验人员，原则是“选两个文件、点一个按钮、看结果表”。
+The GUI is implemented with R Shiny and shipped inside the `nanoamp` R package.
+The Python option has been cancelled; the GUI calls the same R analysis
+functions as the CLI.
 
-## 计划
+## Current implementation
 
-- 技术栈：PySide6（Qt）；
-- 调用方式：调用 Python 核心库或 `02_code/cli` 的统一 CLI，不重复实现算法；
-- 打包：PyInstaller `--onedir` + NSIS 安装包；
-- 随包提供 Windows 版 `minimap2`，避免用户单独安装。
+```r
+library(nanoamp)
+nanoamp_gui()
+```
 
-## 界面要素
+The app provides:
 
-- 测序文件选择（FASTQ / FASTQ.GZ）；
-- 目的序列选择（FASTA）；
-- 输出目录选择；
-- 模式选择：参考引导（默认）/ 从头聚类 / 精确匹配；
-- 参数：`top-n`、最低频率、线程数；
-- 运行按钮、进度条、日志窗口；
-- 结果表：排名、序列、reads 数、比例、是否与参考一致、变异描述；
-- 导出：TSV / Excel / FASTA；可选打开 HTML 报告；
-- 批处理：选择文件夹，自动识别 FASTQ，生成汇总表。
+- FASTQ and reference FASTA file pickers;
+- output directory selection;
+- mode selection (A reference-guided, B de novo, C exact);
+- `top_n` and advanced parameters;
+- run button with progress and captured log;
+- interactive haplotype and variant tables (DT);
+- download buttons for `haplotypes.tsv` and `variants.tsv`;
+- links to the output directory.
 
-## 前置条件
+## Windows launch
 
-1. Python 核心库完成；
-2. CLI 契约稳定（见 `02_code/cli/README.md`）；
-3. PyInstaller + pysam + minimap2 打包验证通过。
+After installing the R package and its dependencies:
+
+```bat
+Rscript -e "library(nanoamp); nanoamp_gui()"
+```
+
+Or use the launcher shipped with the package:
+
+```bat
+02_code\r\inst\scripts\nanoamp-gui.bat
+```
+
+The app starts a local Shiny server and opens the default browser.
+
+## Windows packaging plan
+
+For a double-clickable Windows installer:
+
+1. Build the R package on Windows;
+2. Use RInno to bundle R, the package and its dependencies into one installer;
+3. Bundle `minimap2.exe` and `samtools.exe` (or switch to the planned
+   Rsamtools-only backend) so users do not need to install them separately;
+4. Test on a clean Windows 10/11 machine without R installed.
+
+The RInno skeleton is in `inst/windows/build_installer.R`; it must be run on a
+Windows machine.
+
+## Required packages
+
+```r
+install.packages(c("shiny", "bslib", "DT"))
+```
+
+These are listed in `Suggests` so the core package remains lightweight.

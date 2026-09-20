@@ -25,6 +25,9 @@ install.packages(c(
 # Recommended for Mode B (de novo clustering)
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install("DECIPHER")
+
+# Optional GUI
+install.packages(c("shiny", "DT"))
 ```
 
 ### 2. Install `nanoamp`
@@ -50,6 +53,9 @@ devtools::install("02_code/r")
 ### 3. Install external tools
 
 `minimap2` and `samtools` must be available on `PATH`.
+
+Detailed installation and `PATH` configuration instructions for Linux and
+Windows are in [INSTALL_DEPENDENCIES.md](INSTALL_DEPENDENCIES.md).
 
 ```bash
 minimap2 --version
@@ -238,6 +244,36 @@ library(nanoamp)
 nanoamp_cli(c("call", "--reads", "sample.fastq", "--reference", "target.fa",
               "--outdir", "results/sampleA"))
 ```
+
+## Graphical user interface
+
+Launch the Shiny GUI:
+
+```r
+library(nanoamp)
+nanoamp_gui()
+```
+
+The GUI provides file pickers, mode selection, advanced parameters, a run
+button, a captured log, interactive haplotype/variant tables, QC output and
+download buttons.
+
+On Windows:
+
+```bat
+Rscript -e "library(nanoamp); nanoamp_gui()"
+
+:: or use the shipped launcher
+02_code\r\inst\scripts\nanoamp-gui.bat
+```
+
+To obtain the Shiny app object without starting a server:
+
+```r
+app <- nanoamp_gui_app()
+```
+
+For Windows installer packaging with RInno, see `inst/windows/README.md`.
 
 ## RStudio workflow
 

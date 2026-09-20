@@ -23,6 +23,9 @@ install.packages(c(
 # 方案 B 推荐安装
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install("DECIPHER")
+
+# GUI（可选）
+install.packages(c("shiny", "DT"))
 ```
 
 ### 2. 安装 `nanoamp`
@@ -48,6 +51,9 @@ devtools::install("02_code/r")
 ### 3. 安装外部工具
 
 `minimap2` 和 `samtools` 必须在 `PATH` 中：
+
+Linux 和 Windows 下的详细安装与 PATH 配置说明见
+[INSTALL_DEPENDENCIES-CN.md](INSTALL_DEPENDENCIES-CN.md)。
 
 ```bash
 minimap2 --version
@@ -227,6 +233,35 @@ library(nanoamp)
 nanoamp_cli(c("call", "--reads", "sample.fastq", "--reference", "target.fa",
               "--outdir", "results/sampleA"))
 ```
+
+## 图形界面（GUI）
+
+启动 Shiny GUI：
+
+```r
+library(nanoamp)
+nanoamp_gui()
+```
+
+GUI 提供文件选择、模式选择、高级参数、运行按钮、日志窗口、单倍型/变异交互表格、
+QC 结果和下载按钮。
+
+Windows 上：
+
+```bat
+Rscript -e "library(nanoamp); nanoamp_gui()"
+
+:: 或使用随包附带的启动脚本
+02_code\r\inst\scripts\nanoamp-gui.bat
+```
+
+如果只需要 Shiny app 对象而不启动服务器：
+
+```r
+app <- nanoamp_gui_app()
+```
+
+使用 RInno 制作 Windows 安装包的说明见 `inst/windows/README.md`。
 
 ## RStudio 使用流程
 
