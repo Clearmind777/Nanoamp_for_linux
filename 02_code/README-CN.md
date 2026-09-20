@@ -14,8 +14,7 @@
 |   |-- inst/
 |   |   |-- docs/           # 依赖安装教程
 |   |   |-- scripts/        # run_analysis.R、CLI、测试脚本
-|   |   |-- shiny/          # 独立 Shiny 入口
-|   |   `-- windows/        # RInno 打包骨架
+|   |   `-- shiny/          # 独立 Shiny 入口
 |   |-- tests/testthat/
 |   |-- exec/nanoamp        # 包内 CLI 包装
 |   |-- man/                # 生成的帮助文档
@@ -32,8 +31,8 @@ Python 版本已经取消，后续开发统一以 R 技术栈为主。
 1. **一套算法，多种外壳**：CLI 和 GUI 都调用 `nanoamp` R 包，不重复实现分析逻辑；
 2. **共享契约**：参数名、默认值和输出列在 `shared/` 统一定义；
 3. **数据与代码分离**：测试数据在 `01_data/`，运行结果在 `04_results/<前端>/`；
-4. **GUI 以 Windows 为主要目标**：使用 Shiny，可跨 Windows、Linux、macOS 运行，
-   后续可用 RInno 打包为 Windows 安装包。
+4. **GUI 可移植**：使用 Shiny，同一份 R 包即可在 Linux 和 macOS 上运行，
+   不需要额外的打包步骤。
 5. **优先使用内置工具**：外部工具先从
    `03_dependence/<os>-<arch>/bin/` 解析，其次才是 `PATH`。
 
@@ -74,13 +73,13 @@ library(nanoamp)
 nanoamp_gui()
 ```
 
-Windows 上安装 R 包后，可直接运行：
+安装 R 包后，可在 R 中启动，或使用仓库内启动器：
 
-```bat
-Rscript -e "library(nanoamp); nanoamp_gui()"
+```bash
+Rscript 02_code/gui/run_gui.R
 ```
 
-GUI 规划、启动脚本和 Windows 打包说明见 `gui/README.md`。
+GUI 规划与启动脚本见 `gui/README.md`。
 
 ## 当前状态
 
@@ -89,7 +88,6 @@ GUI 规划、启动脚本和 Windows 打包说明见 `gui/README.md`。
 | R 包 | 已实现，并通过 `R CMD check`（`Status: OK`） |
 | 基于 R 的 CLI | 已实现（`nanoamp_cli()` 和 `02_code/cli`） |
 | R Shiny GUI | 初版已实现（`nanoamp_gui()` 和 `02_code/gui`） |
-| Windows 安装包 | 计划使用 RInno |
 
 外部工具统一放在 `03_dependence/`；平台支持矩阵和 R 内后备方案见
 `03_dependence/README-CN.md`。

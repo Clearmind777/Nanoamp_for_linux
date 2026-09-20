@@ -17,3 +17,9 @@ Planning documents and work reports for the nanoamp project.
 
 Start with `programs_dev_info.md` for the original request and
 `programs_dev_plan_1.md` for the overall design.
+
+The work reports are a historical log of how the project was developed; they are
+kept verbatim and are not rewritten when the tree changes. Reports 5 and 6 in
+particular describe cross-platform work, including the Windows material that now
+lives only in the sister repository
+`a_09_18_26_mapping_programs_dev_for_win`.

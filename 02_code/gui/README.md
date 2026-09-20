@@ -1,4 +1,4 @@
-# Windows GUI (R Shiny)
+# GUI (R Shiny)
 
 The GUI is implemented with R Shiny and shipped inside the `nanoamp` R package.
 The Python option has been cancelled; the GUI calls the same R analysis
@@ -23,35 +23,28 @@ The app provides:
 - links to the output directory;
 - alignment backend selection (`minimap2` or the R-native `r` fallback).
 
-## Windows launch
+## Launch
 
 After installing the R package and its dependencies:
 
-```bat
-Rscript -e "library(nanoamp); nanoamp_gui()"
+```bash
+Rscript 02_code/gui/run_gui.R
 ```
 
-Or use the launcher shipped with the package:
+Or from R:
 
-```bat
-02_code\gui\nanoamp-gui.bat
+```r
+library(nanoamp)
+nanoamp_gui()
 ```
 
 The app starts a local Shiny server and opens the default browser.
 
-## Windows packaging plan
+## Packaging
 
-For a double-clickable Windows installer:
-
-1. Build the R package on Windows;
-2. Use RInno to bundle R, the package and its dependencies into one installer;
-3. Bundle `minimap2.exe` if native speed is needed. `samtools.exe` is optional
-   because `Rsamtools` handles SAM to BAM conversion; the R-native backend
-   (`aligner = "r"`) needs no external tool at all;
-4. Test on a clean Windows 10/11 machine without R installed.
-
-The RInno skeleton is in `inst/windows/build_installer.R`; it must be run on a
-Windows machine.
+This Linux-only variant ships no standalone installer: the GUI runs from the
+installed R package. Windows installer packaging is owned by the sister
+repository `a_09_18_26_mapping_programs_dev_for_win`.
 
 External tools are resolved from `03_dependence/<os>-<arch>/bin/` first; see
 `03_dependence/README.md`.

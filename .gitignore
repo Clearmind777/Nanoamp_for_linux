@@ -1,10 +1,10 @@
-# ---- OS / editor ----
+# OS / editor
 .DS_Store
 Thumbs.db
 *.swp
 *~
 
-# ---- Python ----
+# Python (only used by auxiliary tooling, if any)
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -21,13 +21,13 @@ env/
 htmlcov/
 .ipynb_checkpoints/
 
-# ---- R ----
+# R
 .Rhistory
 .RData
 .Rproj.user/
 renv/library/
 
-# ---- 运行输出与临时文件 ----
+# Run outputs and temporary files
 tmp/
 04_results/*
 !04_results/README.md
@@ -36,13 +36,11 @@ tmp/
 *.tmp
 *.log
 
-# ---- 大型中间文件（test_data 暂作为固定测试集保留在 Git 中）----
-*.bam.bai.tmp
-*.fastq.gz.tmp
-
-# ---- R 构建产物 ----
+# R build artifacts
 *.Rcheck/
 nanoamp_*.tar.gz
 
-# ---- ���߰�װ���������Ĭ�ϲ���⣩----
-dist/
+# Offline runtime build/staging
+03_dependence/build/
+03_dependence/linux-x86_64/nanoamp-r-runtime/
+03_dependence/linux-x86_64/nanoamp-r-runtime.tar.gz

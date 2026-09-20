@@ -15,8 +15,7 @@ the R Shiny GUI.
 |   |-- inst/
 |   |   |-- docs/           # dependency installation guides
 |   |   |-- scripts/        # run_analysis.R, CLI and test scripts
-|   |   |-- shiny/          # standalone Shiny entry point
-|   |   `-- windows/        # RInno packaging skeleton
+|   |   `-- shiny/          # standalone Shiny entry point
 |   |-- tests/testthat/
 |   |-- exec/nanoamp        # package CLI wrapper
 |   |-- man/                # generated help
@@ -36,8 +35,8 @@ External tools are bundled under `03_dependence/` at the repository root.
    defined once in `shared/`.
 3. **Data and code are separate**: test data lives in `01_data/`; run outputs
    live in `04_results/<front-end>/`.
-4. **Windows first for the GUI**: the GUI is built with Shiny so it runs on
-   Windows, Linux and macOS, and can be packaged with RInno later.
+4. **Portable GUI**: the GUI is built with Shiny so it runs on Linux and macOS
+   from the same R package, with no separate packaging step.
 5. **Bundled tools first**: external tools are resolved from
    `03_dependence/<os>-<arch>/bin/` before `PATH`.
 
@@ -78,13 +77,13 @@ library(nanoamp)
 nanoamp_gui()
 ```
 
-On Windows, after installing the package, double-click or run:
+Launch it from R, or with the repository launcher:
 
-```bat
-Rscript -e "library(nanoamp); nanoamp_gui()"
+```bash
+Rscript 02_code/gui/run_gui.R
 ```
 
-See `gui/README.md` for the GUI plan, launchers and Windows packaging notes.
+See `gui/README.md` for the GUI plan and launchers.
 
 ## Status
 
@@ -93,7 +92,6 @@ See `gui/README.md` for the GUI plan, launchers and Windows packaging notes.
 | R package | Implemented and verified with `R CMD check` (`Status: OK`) |
 | R-based CLI | Implemented (`nanoamp_cli()` and `02_code/cli`) |
 | R Shiny GUI | Initial version implemented (`nanoamp_gui()` and `02_code/gui`) |
-| Windows installer | Planned via RInno |
 
 External tools are bundled under `03_dependence/`; see `03_dependence/README.md`
 for the platform support matrix and the R-native fallback.

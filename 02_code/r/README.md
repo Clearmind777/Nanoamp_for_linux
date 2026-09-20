@@ -61,8 +61,8 @@ devtools::install("02_code/r")
 `PATH`. `samtools` is optional: SAM to BAM conversion uses
 `Rsamtools::asBam()` by default.
 
-Detailed installation and `PATH` configuration instructions for Linux and
-Windows are in [inst/docs/INSTALL_DEPENDENCIES.md](inst/docs/INSTALL_DEPENDENCIES.md).
+Detailed installation and `PATH` configuration instructions for Linux are in
+[inst/docs/INSTALL_DEPENDENCIES.md](inst/docs/INSTALL_DEPENDENCIES.md).
 
 `nanoamp` prefers tools from `03_dependence/<os>-<arch>/bin/`, then falls back
 to `PATH`. The repository bundles minimap2 2.31 for Linux x86_64; the platform
@@ -245,8 +245,7 @@ sample	reads	reference
 Optional columns: `ref_label`.
 
 Use `--aligner r` to select the R-native alignment backend on platforms
-without minimap2. The repository-level launcher is `02_code/cli/nanoamp`
-(`02_code/cli/nanoamp.bat` on Windows).
+without minimap2. The repository-level launcher is `02_code/cli/nanoamp`.
 
 ### Install the `nanoamp` command
 
@@ -266,25 +265,22 @@ nanoamp_cli(c("call", "--reads", "sample.fastq", "--reference", "target.fa",
 
 ## Graphical user interface
 
-Launch the Shiny GUI:
+Launch the Shiny GUI from R:
 
 ```r
 library(nanoamp)
 nanoamp_gui()
 ```
 
+Or with the repository launcher:
+
+```bash
+Rscript 02_code/gui/run_gui.R
+```
+
 The GUI provides file pickers, mode selection, advanced parameters, a run
 button, a captured log, interactive haplotype/variant tables, QC output and
 download buttons.
-
-On Windows:
-
-```bat
-Rscript -e "library(nanoamp); nanoamp_gui()"
-
-:: or use the shipped launcher
-02_code\r\inst\scripts\nanoamp-gui.bat
-```
 
 To obtain the Shiny app object without starting a server:
 
@@ -292,12 +288,14 @@ To obtain the Shiny app object without starting a server:
 app <- nanoamp_gui_app()
 ```
 
-For Windows installer packaging with RInno, see `inst/windows/README.md`.
+This Linux-only variant ships no standalone installer: the GUI runs from the
+installed R package. Windows installer packaging is owned by the sister
+repository `a_09_18_26_mapping_programs_dev_for_win`.
 
 ### External tools and the R-native backend
 
 `aligner = "minimap2"` uses the bundled minimap2 binary when available.
-On Windows, ARM platforms, or any machine without minimap2, use:
+On ARM platforms, macOS, or any machine without minimap2, use:
 
 ```r
 run_haplotype_analysis(..., aligner = "r")

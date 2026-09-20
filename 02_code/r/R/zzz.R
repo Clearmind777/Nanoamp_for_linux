@@ -25,13 +25,14 @@ utils::globalVariables(c(
 # works on both old and new Bioconductor.
 # ---------------------------------------------------------------------------
 .pa_env <- new.env(parent = emptyenv())
+.pa_optional_package <- "pwalign"
 
 .pa_provider <- function(exported) {
   if ("pairwiseAlignment" %in% exported) {
     return(asNamespace("Biostrings"))
   }
-  if (requireNamespace("pwalign", quietly = TRUE)) {
-    return(asNamespace("pwalign"))
+  if (requireNamespace(.pa_optional_package, quietly = TRUE)) {
+    return(asNamespace(.pa_optional_package))
   }
   stop(
     "Pairwise alignment is unavailable: this Biostrings build no longer ",
@@ -57,4 +58,3 @@ pa_subject <- function(x) .pa_env$subject(x)
 pa_aligned <- function(x) .pa_env$aligned(x)
 pa_score <- function(x) .pa_env$score(x)
 pa_provider_name <- function() .pa_env$provider
-

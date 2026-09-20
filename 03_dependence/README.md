@@ -1,6 +1,6 @@
 # 03_dependence
 
-External tools bundled with nanoamp.
+External tools bundled with nanoamp (Linux-only variant).
 
 ## Layout
 
@@ -15,23 +15,21 @@ External tools bundled with nanoamp.
 |-- linux-x86_64/bin/
 |   |-- minimap2
 |   `-- samtools          # optional fallback
-|-- windows-x86_64/
-|   |-- README.md
-|   |-- install_msys2_toolchain.ps1   # reproducible toolchain installer
-|   |-- build_minimap2.sh             # builds minimap2.exe from source
-|   `-- bin/minimap2.exe              # built in-repo, statically linked
 |-- linux-arm64/README.md
-|-- windows-arm64/README.md
 |-- macos-x86_64/README.md
 `-- macos-arm64/README.md
 ```
+
+All Windows-specific material (windows-x86_64, windows-arm64, the MSYS2 build
+scripts, the R environment scripts and the offline bundle) lives in the sister
+repository `a_09_18_26_mapping_programs_dev_for_win`.
 
 ## How nanoamp finds external tools
 
 Resolution order:
 
 1. environment variable `NANOAMP_MINIMAP2` / `NANOAMP_SAMTOOLS`;
-2. `03_dependence/<os>-<arch>/bin/<tool>` (`<tool>.exe` on Windows);
+2. `03_dependence/<os>-<arch>/bin/<tool>`;
 3. `PATH`.
 
 `NANOAMP_DEPENDENCE_DIR` can point to a different `03_dependence` location
@@ -45,62 +43,27 @@ the resolved path and version of each tool.
 | Platform | minimap2 | samtools | Notes |
 |---|---|---|---|
 | linux-x86_64 | bundled 2.31 | bundled 1.12 (optional) | Rsamtools is used for SAM -> BAM by default; samtools only with `use_samtools = TRUE` |
-| windows-x86_64 | bundled 2.31 (built in-repo) | not bundled | statically linked, runs without MSYS2/Cygwin/conda/WSL; samtools unnecessary because Rsamtools handles SAM -> BAM |
 | linux-arm64 | not bundled | not bundled | use conda or build from source; R-native backend available |
-| windows-arm64 | no binary | no binary | R-native backend, or run the x86_64 build under emulation |
 | macos-x86_64 | not bundled | not bundled | use conda |
 | macos-arm64 | not bundled | not bundled | use conda |
 
+Windows has no rows here: `windows-x86_64` / `windows-arm64` are owned by the
+sister repository `a_09_18_26_mapping_programs_dev_for_win`, which bundles its
+own statically linked minimap2 binary.
+
 Official upstream facts:
 
-- minimap2 publishes a Linux x86_64 binary; there is no *official* Windows or
-  ARM binary, but the source builds natively on Windows with the MSYS2
-  MINGW-w64 toolchain — that is how `windows-x86_64/bin/minimap2.exe` was made.
-- samtools publishes only source; Windows binaries are not officially provided.
-  htslib's own `INSTALL` documents Windows MSYS2/MINGW64 as the recommended
-  build environment for Windows.
-- conda-forge / bioconda provide `samtools` for Linux ARM64, but not for
-  Windows; bioconda does not support Windows.
-
-## Windows source build
-
-Windows needs no conda and no WSL. Two unattended steps:
-
-```powershell
-# 1. portable MSYS2 + MINGW-w64 toolchain (~1.5 GB, outside the repo)
-pwsh -File 03_dependence/windows-x86_64/install_msys2_toolchain.ps1
-
-# 2. build and install minimap2.exe
-bash 03_dependence/windows-x86_64/build_minimap2.sh
-```
-
-The toolchain itself is not committed (too large); the repository commits the
-two scripts above plus the resulting binary and its provenance.
-See `windows-x86_64/README.md` for the pinned versions, flags and hashes.
-
-## Offline / air-gapped installation
-
-Every upstream installer can be pre-positioned as a pinned, integrity-checked
-bundle so a machine with no network can be provisioned:
-
-```bash
-# with a network
-Rscript 03_dependence/offline-bundle/fetch_offline_bundle.R
-# without a network
-pwsh -File 03_dependence/offline-bundle/install_offline.ps1
-```
-
-The bundle (291 MB: R installer, 109 R package binaries, MSYS2 toolchain,
-minimap2 source) is written to the git-ignored `dist/`. Why the binaries are
-not committed, and the USB / release-asset alternatives, are documented in
-`offline-bundle/README.md`.
+- minimap2 publishes a Linux x86_64 binary; there is no official binary for
+  Linux ARM64 or macOS, where conda or a source build is the usual route.
+- samtools publishes only source; conda-forge / bioconda provide it for Linux
+  and macOS, so `samtools` is a conda install away there.
 
 ## R-native fallback
 
 `run_haplotype_analysis(..., aligner = "r")` uses Biostrings pairwise
 alignment and needs no external binary. It is slower than minimap2 and is
 intended for small and medium amplicons, and for platforms where no minimap2
-binary exists (Windows, ARM).
+binary exists (Linux ARM64, macOS).
 
 `aligner = "minimap2"` is the default for Linux x86_64.
 
@@ -114,7 +77,7 @@ bash 03_dependence/fetch_dependencies.sh
 ```
 
 The script downloads the official minimap2 Linux x86_64 binary and prints
-platform-specific instructions for Linux ARM64, Windows and macOS.
+platform-specific instructions for Linux ARM64 and macOS.
 
 ## Licenses
 
@@ -122,3 +85,34 @@ platform-specific instructions for Linux ARM64, Windows and macOS.
 - samtools: MIT/Expat.
 
 License text for the bundled minimap2 binary is in `licenses/`.
+
+## Offline runtime for Linux x86_64
+
+`linux-x86_64/nanoamp-r-runtime.tar.gz.part*` contains a portable R 4.4.3
+runtime with all required R packages and the `nanoamp` package:
+
+- core R packages: `data.table`, `optparse`, `jsonlite`, `readxl`, `Matrix`;
+- Bioconductor: `Biostrings`, `Rsamtools`, `ShortRead`, `IRanges`,
+  `GenomicAlignments`, `DECIPHER`;
+- GUI: `shiny`, `DT`;
+- `minimap2` and `samtools`.
+
+The runtime is split into 7 parts (<100 MB each). The first invocation of
+`linux-x86_64/nanoamp` or `linux-x86_64/nanoamp-gui` reassembles the parts,
+verifies the SHA256, extracts the runtime and runs `conda-unpack`.
+
+```bash
+# No R installation required
+./03_dependence/linux-x86_64/nanoamp doctor
+./03_dependence/linux-x86_64/nanoamp call \
+  --reads 01_data/ln_test_data/TSM20260826/E4-3/reads.fastq \
+  --reference 01_data/ln_test_data/TSM20260826/E4-3/reference.self.fa \
+  --mode A --outdir 04_results/cli/offline-demo
+./03_dependence/linux-x86_64/nanoamp-gui
+```
+
+Rebuild the runtime on a Linux x86_64 machine with network access:
+
+```bash
+bash 03_dependence/linux-x86_64/build_runtime.sh
+```

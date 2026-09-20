@@ -53,7 +53,7 @@ devtools::install("02_code/r")
 `minimap2` 会优先从 `03_dependence/<os>-<arch>/bin/` 解析，其次才是 `PATH`。
 `samtools` 不是必需依赖：默认用 `Rsamtools::asBam()` 完成 SAM→BAM。
 
-Linux 和 Windows 下的详细安装与 PATH 配置说明见
+Linux 下的详细安装与 PATH 配置说明见
 [inst/docs/INSTALL_DEPENDENCIES-CN.md](inst/docs/INSTALL_DEPENDENCIES-CN.md)。
 
 `nanoamp` 会优先使用 `03_dependence/<os>-<arch>/bin/` 中的工具，其次才是
@@ -227,8 +227,7 @@ sample	reads	reference
 可选列：`ref_label`。
 
 在没有 minimap2 的平台上，可以用 `--aligner r` 选择 R 内比对后端。
-仓库级启动器是 `02_code/cli/nanoamp`（Windows 下为
-`02_code/cli/nanoamp.bat`）。
+仓库级启动器是 `02_code/cli/nanoamp`。
 
 ### 安装 `nanoamp` 命令
 
@@ -258,13 +257,10 @@ nanoamp_gui()
 GUI 提供文件选择、模式选择、高级参数、运行按钮、日志窗口、单倍型/变异交互表格、
 QC 结果和下载按钮。
 
-Windows 上：
+也可以使用仓库内启动器：
 
-```bat
-Rscript -e "library(nanoamp); nanoamp_gui()"
-
-:: 或使用随包附带的启动脚本
-02_code\r\inst\scripts\nanoamp-gui.bat
+```bash
+Rscript 02_code/gui/run_gui.R
 ```
 
 如果只需要 Shiny app 对象而不启动服务器：
@@ -273,12 +269,14 @@ Rscript -e "library(nanoamp); nanoamp_gui()"
 app <- nanoamp_gui_app()
 ```
 
-使用 RInno 制作 Windows 安装包的说明见 `inst/windows/README.md`。
+本仓库是仅面向 Linux 的变体，不提供独立安装包：GUI 直接由已安装的 R 包运行。
+Windows 安装包相关材料由姊妹仓库
+`a_09_18_26_mapping_programs_dev_for_win` 维护。
 
 ### 外部工具与 R 内后端
 
 `aligner = "minimap2"` 会优先使用内置的 minimap2 二进制。
-Windows、ARM 或没有 minimap2 的机器上可以改用：
+ARM、macOS 或没有 minimap2 的机器上可以改用：
 
 ```r
 run_haplotype_analysis(..., aligner = "r")

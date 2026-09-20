@@ -1,6 +1,6 @@
 # nanoamp 依赖安装与配置
 
-本文说明如何在 Linux 和 Windows 上安装并配置 `minimap2`、`samtools`
+本文说明如何在 Linux 上安装并配置 `minimap2`、`samtools`
 以及 `nanoamp` 需要的 R 包。
 
 ## 1. 需要哪些依赖
@@ -25,9 +25,10 @@
 3. `PATH`。
 
 仓库已在 `03_dependence/linux-x86_64/bin/` 内置 minimap2 2.31。完整平台矩阵见
-`03_dependence/README-CN.md`。
+`03_dependence/README-CN.md`。Windows 依赖材料由姊妹仓库
+`a_09_18_26_mapping_programs_dev_for_win` 维护。
 
-没有 minimap2 二进制的平台（Windows、ARM）可以使用 R 内后端：
+没有 minimap2 二进制的平台（Linux ARM64、macOS）可以使用 R 内后端：
 
 ```r
 run_haplotype_analysis(..., aligner = "r")
@@ -51,7 +52,7 @@ which samtools
 samtools --version
 ```
 
-然后在这个 R 环境中安装 R 包（见第 4 节）。
+然后在这个 R 环境中安装 R 包（见第 3 节）。
 
 ### 方式 B：系统包管理器
 
@@ -77,67 +78,7 @@ which samtools
 Rscript -e 'library(nanoamp); nanoamp_cli("doctor")'
 ```
 
-## 3. Windows
-
-`minimap2` 和 `samtools` 都没有官方 Windows 二进制，conda-forge / bioconda
-也不提供 win-64 构建。请从以下方案中选择。
-
-### 方式 A：R 内后端（推荐）
-
-使用 R 内比对后端，不需要任何外部工具：
-
-```r
-run_haplotype_analysis(..., aligner = "r")
-```
-
-这是 Windows 上最简单的方案，适合中小扩增子。
-
-### 方式 B：WSL2（需要 minimap2 速度时推荐）
-
-1. 安装 WSL2 和 Ubuntu；
-2. 在 WSL 内按第 2 节的 Linux 步骤安装 minimap2；
-3. 在 WSL 中运行 nanoamp，并指向相应数据文件。
-
-### 方式 C：第三方 Windows 二进制（可选）
-
-如果你有第三方 Windows 构建，放到：
-
-```text
-03_dependence\windows-x86_64\bin\minimap2.exe
-03_dependence\windows-x86_64\bin\samtools.exe    # 可选
-```
-
-nanoamp 会自动解析这些文件。`samtools.exe` 是可选的，因为默认用
-`Rsamtools` 完成 SAM→BAM。
-
-### 在 Windows 配置 PATH（仅方式 C 需要）
-
-1. 打开 **系统属性 -> 环境变量**；
-2. 编辑 `Path`；
-3. 加入包含 `minimap2.exe`（以及可选的 `samtools.exe`）的目录；
-4. 确定后**重启 RStudio / 终端**；
-5. 在 R 中验证：
-
-```r
-Sys.which("minimap2")
-Sys.which("samtools")   # 可选
-library(nanoamp)
-nanoamp_cli("doctor")
-```
-
-也可以跳过 PATH，直接把二进制放到
-`03_dependence\windows-x86_64\bin\`。
-
-### Windows 常见坑
-
-- **不要依赖 `conda install minimap2 samtools`**：这两个包没有 win-64 构建；
-- **PATH 未刷新**：修改 PATH 后必须重启 RStudio；
-- **路径有空格或中文**：建议放到 `C:\tools\...`；
-- **Windows SmartScreen**：如果提示拦截下载的 exe，需要手动允许；
-- **多个 R 版本**：用 `Rscript -e 'cat(R.home())'` 确认当前 R，
-  并确保 R 包装到了同一个 R 中。
-
-## 4. R 包
+## 3. R 包
 
 必需：
 
@@ -162,7 +103,7 @@ BiocManager::install("DECIPHER")             # 方案 B
 install.packages(c("shiny", "DT"))  # GUI
 ```
 
-## 5. 验证清单
+## 4. 验证清单
 
 ```r
 library(nanoamp)
@@ -189,13 +130,13 @@ Rscript: ...
 - R 包显示 `TRUE`；
 - `DECIPHER` 可以是 `FALSE`：方案 B 会自动降级，但建议安装。
 
-## 6. 依赖缩减现状
+## 5. 依赖缩减现状
 
 以下改进已经实现：
 
 1. 默认用 `Rsamtools::asBam()` 完成 SAM→BAM，`samtools` 命令变成可选；
 2. `aligner = "r"` 提供 R 内成对比对后端，适合中小数据，以及没有
-   minimap2 的 Windows / ARM 平台；
+   minimap2 的 Linux ARM64 / macOS 平台；
 3. `minimap2` 仍然是大数据量下的推荐后端。
 
 只有显式设置 `use_samtools = TRUE` 时才需要 samtools。

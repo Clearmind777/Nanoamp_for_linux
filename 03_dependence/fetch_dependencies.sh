@@ -1,8 +1,8 @@
 #!/bin/sh
-# Fetch bundled external tools for nanoamp.
+# Fetch bundled external tools for nanoamp (Linux-only variant).
 #
-# Currently tested path: linux-x86_64 minimap2 download.
-# Other platforms are documented with conda / source instructions.
+# Implemented recipe: linux-x86_64 minimap2 download.
+# linux-arm64 and macOS print conda / source instructions.
 set -e
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -54,16 +54,6 @@ Options:
        -c conda-forge -c bioconda minimap2 samtools
      then copy bin/minimap2 and bin/samtools to 03_dependence/linux-arm64/bin/
   2. run nanoamp with aligner = "r" (no external tool required)
-EOF
-    ;;
-  windows-*)
-    cat <<'EOF'
-There is no official samtools or minimap2 Windows binary.
-Options:
-  1. run nanoamp with aligner = "r" (R-native alignment, no external tool);
-  2. use WSL2 and run the Linux version inside WSL;
-  3. if you have third-party Windows binaries, place minimap2.exe and
-     samtools.exe in 03_dependence/windows-x86_64/bin/ (or windows-arm64/bin/).
 EOF
     ;;
   darwin-*|macos-*)

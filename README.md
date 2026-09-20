@@ -4,6 +4,13 @@
 and a target sequence, it corrects sequencing errors, reconstructs haplotypes,
 and reports the most abundant sequences with counts and proportions.
 
+> **This repository is the Linux-only variant.** Bundled tools, CI and
+> documentation all target Linux. Every piece of Windows-specific material
+> (prebuilt `minimap2.exe`, the MSYS2 toolchain and build scripts, the RInno
+> installer skeleton, the R environment scripts and the offline installer
+> bundle) lives in the sister repository
+> `a_09_18_26_mapping_programs_dev_for_win`.
+
 ## Repository layout
 
 ```text
@@ -21,6 +28,22 @@ tmp/              scratch space (Git ignored)
 ```
 
 ## Quick start
+
+### Fully offline (Linux x86_64, no R installation required)
+
+```bash
+./03_dependence/linux-x86_64/nanoamp doctor
+./03_dependence/linux-x86_64/nanoamp call \
+  --reads 01_data/ln_test_data/TSM20260826/E4-3/reads.fastq \
+  --reference 01_data/ln_test_data/TSM20260826/E4-3/reference.self.fa \
+  --mode A --outdir 04_results/cli/offline-demo
+./03_dependence/linux-x86_64/nanoamp-gui
+```
+
+The first run reassembles the split runtime bundle, verifies its checksum,
+extracts R 4.4.3 and all R package dependencies, and runs the analysis.
+
+### Use an existing R installation
 
 ```bash
 # 1. Install the R package
@@ -63,12 +86,10 @@ res$haplotypes
 | `02_code/README.md` | source tree and component status |
 | `02_code/r/README.md` | R package tutorial (English) |
 | `02_code/r/README-CN.md` | R package tutorial (Chinese) |
-| `02_code/r/inst/docs/INSTALL_DEPENDENCIES.md` | minimap2 / samtools installation on Linux and Windows |
+| `02_code/r/inst/docs/INSTALL_DEPENDENCIES.md` | minimap2 / samtools installation on Linux |
 | `02_code/cli/README.md` | CLI contract and launchers |
-| `02_code/gui/README.md` | GUI features and Windows packaging |
+| `02_code/gui/README.md` | GUI features and launchers |
 | `03_dependence/README.md` | bundled tools and platform support matrix |
-| `03_dependence/windows-x86_64/README.md` | Windows source build of minimap2 |
-| `03_dependence/r-environment/README.md` | R environment setup (Windows) |
 | `00_materials/README.md` | planning documents and work reports |
 
 ## External tools
@@ -79,14 +100,9 @@ res$haplotypes
 2. `03_dependence/<os>-<arch>/bin/`;
 3. `PATH`.
 
-The repository bundles minimap2 2.31 for **Linux x86_64 and Windows x86_64**.
-The Windows binary is built from upstream source in this repository and is
-statically linked, so it needs no MSYS2, Cygwin, conda or WSL at runtime:
-
-```powershell
-pwsh -File 03_dependence/windows-x86_64/install_msys2_toolchain.ps1  # toolchain
-bash 03_dependence/windows-x86_64/build_minimap2.sh                  # build
-```
+The repository bundles minimap2 2.31 for **Linux x86_64**, plus an optional
+samtools 1.12 fallback. Linux ARM64 and macOS have no bundled binary; the fetch
+recipes and the platform matrix are in `03_dependence/README.md`.
 
 On platforms without a bundled binary (ARM), use the R-native backend:
 
@@ -100,38 +116,19 @@ default, so no samtools binary is needed on any platform.
 ## Running the test suite
 
 ```bash
-# on Windows, first repair the test-data symlink layer (no-op on Linux)
-Rscript 03_dependence/r-environment/materialize_test_data.R
-
 # unit tests (uses the bundled/installed minimap2 when available)
-Rscript 03_dependence/r-environment/run_tests.R
+Rscript -e 'devtools::test("02_code/r", reporter = "summary")'
+
+# build and R CMD check into 05_builds/r
+make check
 
 # functional regression over the real datasets in 01_data/
-Rscript 03_dependence/r-environment/run_functional_regression.R \
-  --outdir 04_results/r/test_run_win --modes A,B,C --threads 4
+Rscript 02_code/r/inst/scripts/run_functional_tests.R \
+  --outdir 04_results/r/test_run --modes A,B,C --threads 4
 ```
 
-See `03_dependence/r-environment/README.md` for a from-scratch Windows
-environment setup (R install, mirrors, dependency installation).
-
-## Offline / air-gapped installation
-
-To provision a machine with no network, build a pinned bundle of every upstream
-installer (R, all 109 R package binaries, the MSYS2 toolchain for rebuilds,
-minimap2 source) and install from it:
-
-```bash
-# on a machine with a network
-Rscript 03_dependence/offline-bundle/fetch_offline_bundle.R
-
-# on the offline machine
-pwsh -File 03_dependence/offline-bundle/install_offline.ps1
-```
-
-The 291 MB bundle lands in `dist/`, which is git-ignored: the repository keeps
-the reproducible recipe and hashes, not the binaries. Rationale and the
-self-contained alternatives (USB payload, GitHub release assets) are in
-`03_dependence/offline-bundle/README.md`.
+The normalised symlink layer in `01_data/ln_test_data/` is checked out as real
+symlinks on Linux, so no repair step is needed before running the tests.
 
 ## Common commands
 

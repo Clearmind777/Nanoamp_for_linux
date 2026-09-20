@@ -56,25 +56,6 @@ nanoamp doctor
 The installed R package also ships an equivalent script at
 `system.file("scripts", "install_cli.sh", package = "nanoamp")`.
 
-### Windows
-
-After installing the R package, use one of:
-
-```bat
-:: Install a wrapper
-02_code\cli\install_cli.bat %USERPROFILE%\bin
-
-:: Or use the repository launcher directly
-02_code\cli\nanoamp.bat call --reads sample.fastq --reference target.fa --outdir results\sampleA
-```
-
-You can also add a `nanoamp.cmd` wrapper to a directory on `PATH`:
-
-```bat
-@echo off
-Rscript --vanilla -e "library(nanoamp); nanoamp_cli()" %*
-```
-
 ## Outputs
 
 `call` writes `haplotypes.tsv`, `haplotypes.fasta`, `variants.tsv`, `qc.tsv` and

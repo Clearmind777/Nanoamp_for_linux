@@ -3,6 +3,11 @@
 `nanoamp` 用于分析纳米孔 PCR 产物的测序数据。给定 FASTQ 和目的序列，它会校正
 测序错误、重建单倍型，并输出数量最多、比例最高的序列。
 
+> **本仓库是仅面向 Linux 的变体。** 内置工具、CI 和文档都以 Linux 为目标。
+> 所有 Windows 专属内容（预编译的 `minimap2.exe`、MSYS2 工具链与编译脚本、
+> RInno 安装包骨架、R 环境脚本以及离线安装包）都放在姊妹仓库
+> `a_09_18_26_mapping_programs_dev_for_win` 中。
+
 ## 仓库结构
 
 ```text
@@ -20,6 +25,21 @@ tmp/              临时目录（Git 忽略）
 ```
 
 ## 快速开始
+
+### 完全离线（Linux x86_64，无需安装 R）
+
+```bash
+./03_dependence/linux-x86_64/nanoamp doctor
+./03_dependence/linux-x86_64/nanoamp call \
+  --reads 01_data/ln_test_data/TSM20260826/E4-3/reads.fastq \
+  --reference 01_data/ln_test_data/TSM20260826/E4-3/reference.self.fa \
+  --mode A --outdir 04_results/cli/offline-demo
+./03_dependence/linux-x86_64/nanoamp-gui
+```
+
+首次运行会自动重组运行时、校验校验和、解压 R 4.4.3 和全部 R 包依赖，然后执行分析。
+
+### 使用已有 R 环境
 
 ```bash
 # 1. 安装 R 包
@@ -62,9 +82,9 @@ res$haplotypes
 | `02_code/README.md` | 源码目录与组件状态 |
 | `02_code/r/README.md` | R 包教程（英文） |
 | `02_code/r/README-CN.md` | R 包教程（中文） |
-| `02_code/r/inst/docs/INSTALL_DEPENDENCIES-CN.md` | Linux/Windows 下 minimap2、samtools 安装 |
+| `02_code/r/inst/docs/INSTALL_DEPENDENCIES-CN.md` | Linux 下 minimap2、samtools 安装 |
 | `02_code/cli/README.md` | CLI 契约与启动器 |
-| `02_code/gui/README.md` | GUI 功能与 Windows 打包 |
+| `02_code/gui/README.md` | GUI 功能与启动器 |
 | `03_dependence/README-CN.md` | 内置工具与平台支持矩阵 |
 | `00_materials/README.md` | 规划文档与工作报告索引 |
 
@@ -76,8 +96,11 @@ res$haplotypes
 2. `03_dependence/<os>-<arch>/bin/`；
 3. `PATH`。
 
-仓库已内置 Linux x86_64 的 minimap2 2.31。没有官方 minimap2 二进制的平台
-（Windows、ARM）可以使用 R 内后端：
+仓库已内置 Linux x86_64 的 minimap2 2.31，以及可选的 samtools 1.12 后备。
+Linux ARM64 和 macOS 没有内置二进制，获取方式和平台矩阵见
+`03_dependence/README-CN.md`。
+
+这些平台可以使用 R 内后端：
 
 ```r
 run_haplotype_analysis(..., aligner = "r")
