@@ -100,6 +100,9 @@ default, so no samtools binary is needed on any platform.
 ## Running the test suite
 
 ```bash
+# on Windows, first repair the test-data symlink layer (no-op on Linux)
+Rscript 03_dependence/r-environment/materialize_test_data.R
+
 # unit tests (uses the bundled/installed minimap2 when available)
 Rscript 03_dependence/r-environment/run_tests.R
 

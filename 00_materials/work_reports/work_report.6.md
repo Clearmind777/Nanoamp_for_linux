@@ -200,6 +200,58 @@ R CMD build + R CMD check --no-manual --no-build-vignettes
 注意：minimap2 就位后，原先被跳过的两个 Mode A / Mode B 测试**不再跳过**，
 所以通过数从 24 上升到 34、跳过数降为 0。
 
+### 4.5 干净克隆端到端验证
+
+为了确认"仓库里提交的东西真的可用"，把仓库克隆到 `D:\tools\verify_clone\nanoamp`
+并只走仓库内的文档流程，不做任何手工修补。过程中发现并修复了两个问题（见 4.6）：
+
+```text
+git clone <repo> D:\tools\verify_clone\nanoamp        # 成功，历史完整
+
+# 二进制与行尾完整性
+cloned minimap2.exe sha256 = 82f04339...bd1542        # 与提交一致
+build_minimap2.sh CRLF count = 0                      # .gitattributes 生效
+cloned minimap2.exe --version -> 2.31-r1302           # 克隆产物可直接运行
+
+# 修复软链接层后
+Rscript 03_dependence/r-environment/materialize_test_data.R
+  materialized (copied) : 201 / 201
+  ALL ln_test_data LINKS RESOLVE TO THE CORRECT CONTENT
+
+Rscript 03_dependence/r-environment/run_tests.R
+  passed 34 | failed 0 | errors 0 | skipped 0         # ALL TESTS PASSED
+
+Rscript 03_dependence/r-environment/run_functional_regression.R \
+  --outdir 04_results/r/clone_verify --modes A,B,C --threads 4
+  A: 56/56 ok, mean_overlap 0.9807
+  B: 56/56 ok, mean_overlap 0.5409
+  C: 56/56 ok, mean_top1 0.1231
+  => 168/168 全部成功，Mode A 与原始工作区结果一致
+```
+
+### 4.6 干净克隆暴露并修复的两个问题
+
+**(1) `ln_test_data` 软链接层在 Windows 上是坏的。**
+`01_data/ln_test_data/**` 在 Git 中以**符号链接**（mode `120000`）存储。
+Windows 只有在开启开发者模式（或具备 `SeCreateSymbolicLinkPrivilege`）时才能创建符号链接，
+否则：
+
+- `git checkout` 把链接目标写成约 100 字节的**纯文本文件**；
+- `prepare_test_data.R` 里的 `file.symlink()` 直接返回 `FALSE`，什么都不建。
+
+于是每个 `ln_test_data` 文件里存的是路径字符串而不是序列数据，任何读取它们的分析都会失败。
+干净克隆里表现为 `test-gui.R` 的 4 个失败。
+
+修复：新增 `03_dependence/r-environment/materialize_test_data.R`，
+逐行对照 `manifest.tsv`，把仍是 stub 的项**按内容复制**为目标文件；
+用 `Sys.readlink()` 识别真正的符号链接并跳过，因此在 Linux 上是空操作。
+脚本最后对全部 201 项做 MD5 校验。
+
+**(2) 功能回归包装脚本在子进程里丢了库路径。**
+原实现用 `--vanilla` 启动子 `Rscript`，而 `--vanilla` 会跳过 `Rprofile.site`，
+于是子进程看不到专用库，报 `there is no package called 'data.table'`。
+改为把库路径通过 `R_LIBS` 传给子进程，并用 `--no-save --no-restore` 启动。
+
 ---
 
 ## 5. 功能回归（Windows vs Linux）
@@ -236,6 +288,9 @@ Mode A 是默认且最常用的模式，其"复现公司变异"和"100% 重合�
 唯一未 100% 重合的样本仍是 `ZNF8/clone_3`（5/9），与 Linux 基线一致，
 属于已知的重复区 indel 左对齐问题，非本轮引入。
 
+Mode B 的平均 top1 占比在两次运行间有极小抖动（0.7286 vs 0.7281，
+干净克隆 168/168 那次），聚类路径本身受实现细节影响，属正常范围。
+
 ---
 
 ## 6. 仓库变更清单
@@ -252,7 +307,8 @@ Mode A 是默认且最常用的模式，其"复现公司变异"和"100% 重合�
 | `03_dependence/windows-x86_64/bin/minimap2.exe` | 新增（编译产物） |
 | `03_dependence/windows-x86_64/README.md` | 重写：真实构建路径、参数、哈希 |
 | `03_dependence/windows-arm64/README.md` | 重写：去掉 WSL 建议 |
-| `03_dependence/r-environment/*` | 新增：R 环境搭建与测试运行脚本 |
+| `03_dependence/r-environment/*` | 新增：R 环境搭建、软链接层修复与测试运行脚本 |
+| `.gitattributes` | 新增：固定行尾（`.sh`/`R` LF，`.ps1`/`.bat` CRLF）与二进制处理 |
 | `03_dependence/manifest.tsv` | 新增 windows-x86_64 行 |
 | `03_dependence/README.md` / `README-CN.md` | 平台矩阵与上游事实更正 |
 | `README.md` | 外部工具、Windows 构建、测试运行说明 |
@@ -261,17 +317,19 @@ Mode A 是默认且最常用的模式，其"复现公司变异"和"100% 重合�
 
 ## 7. 已知限制
 
-1. 未在**干净的** Windows 机器上验证 `minimap2.exe`（本机装了 MSYS2）。
-   不过 `objdump` 显示只依赖 `KERNEL32.dll` 与 `msvcrt.dll`，静态链接已确认。
+1. 未在**干净的** Windows 机器上验证 `minimap2.exe` 的 DLL 依赖满足情况
+   （本机装了 MSYS2）。不过干净克隆里的产物可直接运行，且 `objdump` 显示只依赖
+   `KERNEL32.dll` 与 `msvcrt.dll`，静态链接已确认。
 2. samtools **未**在 Windows 编译。它在本项目中是可选的（默认走
    `Rsamtools::asBam()`），本轮判断收益不足；htslib 官方支持该路径，需要时可补。
 3. Windows ARM64 仍未验证，当前建议跑 x86_64 版本（模拟）或用 R 内后端。
 4. `R CMD check` 在 Windows 上通过，但检查环境里没有 `03_dependence`，
    因此 Mode A/B 测试在该场景下会跳过；完整覆盖需用
-   `03_dependence/r-environment/run_tests.R`（本机已跑通，0 跳过）。
-5. `01_data/ln_test_data/**` 在 Windows 上因 `core.symlinks=false` 显示为修改，
-   是平台差异而非内容漂移；本轮未处理。
-6. Mode B 的 overlap 与 Linux 略有差异（0.5409 vs 0.5048），
+   `03_dependence/r-environment/run_tests.R`（本机与干净克隆均已跑通，0 跳过）。
+5. `ln_test_data` 软链接层在 Windows 上仍需手工跑一次
+   `materialize_test_data.R`（已自动化，但不是 `git clone` 后即用）。
+   彻底解决可考虑把该层改为普通文件、改用 Git LFS，或要求开发者模式。
+6. Mode B 的 top1 占比在多次运行间有微小抖动（0.7286 / 0.7281），
    聚类路径本身受实现细节影响，未逐样本深究。
 
 ---
