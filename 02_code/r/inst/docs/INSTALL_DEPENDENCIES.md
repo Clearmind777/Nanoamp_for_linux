@@ -11,7 +11,6 @@ the R packages required by `nanoamp` on Linux.
 | `samtools` | optional external command | Compatibility fallback; Rsamtools is used by default |
 | R packages | R packages | Core analysis |
 | `DECIPHER` | optional R package | Mode B de novo clustering |
-| `shiny`, `bslib`, `DT` | optional R packages | GUI |
 
 Mode C (raw exact matching) does not need `minimap2`. `samtools` is never
 required because `Rsamtools::asBam()` handles SAM to BAM conversion.
@@ -102,7 +101,6 @@ Optional:
 
 ```r
 BiocManager::install("DECIPHER")          # Mode B
-install.packages(c("shiny", "DT"))  # GUI
 ```
 
 ## 4. Verification checklist

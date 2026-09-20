@@ -29,9 +29,6 @@ BiocManager::install("DECIPHER")
 # Required for aligner = "r" on Bioconductor >= 3.19, which moved
 # pairwiseAlignment() out of Biostrings
 BiocManager::install("pwalign")
-
-# Optional GUI
-install.packages(c("shiny", "DT"))
 ```
 
 ### 2. Install `nanoamp`
@@ -263,36 +260,7 @@ nanoamp_cli(c("call", "--reads", "sample.fastq", "--reference", "target.fa",
               "--outdir", "results/sampleA"))
 ```
 
-## Graphical user interface
-
-Launch the Shiny GUI from R:
-
-```r
-library(nanoamp)
-nanoamp_gui()
-```
-
-Or with the repository launcher:
-
-```bash
-Rscript 02_code/gui/run_gui.R
-```
-
-The GUI provides file pickers, mode selection, advanced parameters, a run
-button, a captured log, interactive haplotype/variant tables, QC output and
-download buttons.
-
-To obtain the Shiny app object without starting a server:
-
-```r
-app <- nanoamp_gui_app()
-```
-
-This Linux-only variant ships no standalone installer: the GUI runs from the
-installed R package. Windows installer packaging is owned by the sister
-repository `a_09_18_26_mapping_programs_dev_for_win`.
-
-### External tools and the R-native backend
+## External tools and the R-native backend
 
 `aligner = "minimap2"` uses the bundled minimap2 binary when available.
 On ARM platforms, macOS, or any machine without minimap2, use:

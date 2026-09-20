@@ -39,8 +39,3 @@ tmp/
 # R build artifacts
 *.Rcheck/
 nanoamp_*.tar.gz
-
-# Offline runtime build/staging
-03_dependence/build/
-03_dependence/linux-x86_64/nanoamp-r-runtime/
-03_dependence/linux-x86_64/nanoamp-r-runtime.tar.gz

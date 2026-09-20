@@ -2,8 +2,6 @@
 
 export(nanoamp_cli)
 export(nanoamp_defaults)
-export(nanoamp_gui)
-export(nanoamp_gui_app)
 export(nanoamp_version)
 export(run_haplotype_analysis)
 import(data.table)

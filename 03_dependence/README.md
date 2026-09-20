@@ -21,8 +21,8 @@ External tools bundled with nanoamp (Linux-only variant).
 ```
 
 All Windows-specific material (windows-x86_64, windows-arm64, the MSYS2 build
-scripts, the R environment scripts and the offline bundle) lives in the sister
-repository `a_09_18_26_mapping_programs_dev_for_win`.
+scripts and the R environment scripts) lives in the sister repository
+`a_09_18_26_mapping_programs_dev_for_win`.
 
 ## How nanoamp finds external tools
 
@@ -85,34 +85,3 @@ platform-specific instructions for Linux ARM64 and macOS.
 - samtools: MIT/Expat.
 
 License text for the bundled minimap2 binary is in `licenses/`.
-
-## Offline runtime for Linux x86_64
-
-`linux-x86_64/nanoamp-r-runtime.tar.gz.part*` contains a portable R 4.4.3
-runtime with all required R packages and the `nanoamp` package:
-
-- core R packages: `data.table`, `optparse`, `jsonlite`, `readxl`, `Matrix`;
-- Bioconductor: `Biostrings`, `Rsamtools`, `ShortRead`, `IRanges`,
-  `GenomicAlignments`, `DECIPHER`;
-- GUI: `shiny`, `DT`;
-- `minimap2` and `samtools`.
-
-The runtime is split into 7 parts (<100 MB each). The first invocation of
-`linux-x86_64/nanoamp` or `linux-x86_64/nanoamp-gui` reassembles the parts,
-verifies the SHA256, extracts the runtime and runs `conda-unpack`.
-
-```bash
-# No R installation required
-./03_dependence/linux-x86_64/nanoamp doctor
-./03_dependence/linux-x86_64/nanoamp call \
-  --reads 01_data/ln_test_data/TSM20260826/E4-3/reads.fastq \
-  --reference 01_data/ln_test_data/TSM20260826/E4-3/reference.self.fa \
-  --mode A --outdir 04_results/cli/offline-demo
-./03_dependence/linux-x86_64/nanoamp-gui
-```
-
-Rebuild the runtime on a Linux x86_64 machine with network access:
-
-```bash
-bash 03_dependence/linux-x86_64/build_runtime.sh
-```

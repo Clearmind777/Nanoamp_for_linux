@@ -11,7 +11,6 @@
 | `samtools` | 可选外部命令 | 兼容后备；默认使用 Rsamtools |
 | R 包 | R 包 | 核心分析 |
 | `DECIPHER` | 可选 R 包 | 方案 B 从头聚类 |
-| `shiny`、`bslib`、`DT` | 可选 R 包 | GUI |
 
 方案 C（原始精确匹配）不需要 `minimap2`。`samtools` 从来不是必需依赖，
 因为 `Rsamtools::asBam()` 已经负责 SAM→BAM。
@@ -100,7 +99,6 @@ BiocManager::install(c("Biostrings", "Rsamtools", "ShortRead", "IRanges"))
 
 ```r
 BiocManager::install("DECIPHER")             # 方案 B
-install.packages(c("shiny", "DT"))  # GUI
 ```
 
 ## 4. 验证清单

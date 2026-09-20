@@ -5,7 +5,7 @@ README.
 
 ```text
 04_results/
-|-- r/                 # R package / CLI / GUI test runs
+|-- r/                 # R package / CLI test runs
 |   `-- test_run_3/    # current canonical functional test
 |-- cli/               # CLI smoke examples
 `-- _archive/          # older runs kept locally for reference

@@ -23,9 +23,6 @@ install.packages(c(
 # 方案 B 推荐安装
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install("DECIPHER")
-
-# GUI（可选）
-install.packages(c("shiny", "DT"))
 ```
 
 ### 2. 安装 `nanoamp`
@@ -245,35 +242,7 @@ nanoamp_cli(c("call", "--reads", "sample.fastq", "--reference", "target.fa",
               "--outdir", "results/sampleA"))
 ```
 
-## 图形界面（GUI）
-
-启动 Shiny GUI：
-
-```r
-library(nanoamp)
-nanoamp_gui()
-```
-
-GUI 提供文件选择、模式选择、高级参数、运行按钮、日志窗口、单倍型/变异交互表格、
-QC 结果和下载按钮。
-
-也可以使用仓库内启动器：
-
-```bash
-Rscript 02_code/gui/run_gui.R
-```
-
-如果只需要 Shiny app 对象而不启动服务器：
-
-```r
-app <- nanoamp_gui_app()
-```
-
-本仓库是仅面向 Linux 的变体，不提供独立安装包：GUI 直接由已安装的 R 包运行。
-Windows 安装包相关材料由姊妹仓库
-`a_09_18_26_mapping_programs_dev_for_win` 维护。
-
-### 外部工具与 R 内后端
+## 外部工具与 R 内后端
 
 `aligner = "minimap2"` 会优先使用内置的 minimap2 二进制。
 ARM、macOS 或没有 minimap2 的机器上可以改用：
