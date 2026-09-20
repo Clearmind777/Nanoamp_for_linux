@@ -6,18 +6,18 @@ GUI have reserved locations.
 
 ```text
 02_code/
-├── shared/                 # Cross-language parameters and output schema
-│   ├── params/default_params.json
-│   └── docs/output_schema.md
-├── r/                      # R package (available)
-│   ├── R/
-│   ├── inst/scripts/
-│   ├── tests/
-│   ├── DESCRIPTION
-│   └── README.md / README-CN.md
-├── python/                 # Python implementation (placeholder)
-├── cli/                    # CLI contract and wrappers
-└── gui/                    # Windows GUI (planned)
+|-- shared/                 # Cross-language parameters and output schema
+|   |-- params/default_params.json
+|   `-- docs/output_schema.md
+|-- r/                      # R package (available)
+|   |-- R/
+|   |-- inst/scripts/
+|   |-- tests/
+|   |-- DESCRIPTION
+|   `-- README.md / README-CN.md
+|-- python/                 # Python implementation (placeholder)
+|-- cli/                    # CLI contract and wrappers
+`-- gui/                    # Windows GUI (planned)
 ```
 
 ## Design principles

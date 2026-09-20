@@ -156,12 +156,12 @@ nanoamp_defaults()
 
 ```text
 outdir/
-├── haplotypes.tsv
-├── haplotypes.fasta
-├── variants.tsv
-├── qc.tsv
-├── run_manifest.json
-└── alignments.bam(.bai)     # Modes A and B, when keep_intermediates = TRUE
+|-- haplotypes.tsv
+|-- haplotypes.fasta
+|-- variants.tsv
+|-- qc.tsv
+|-- run_manifest.json
+`-- alignments.bam(.bai)     # Modes A and B, when keep_intermediates = TRUE
 ```
 
 ### haplotypes.tsv
