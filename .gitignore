@@ -25,7 +25,6 @@ htmlcov/
 .Rhistory
 .RData
 .Rproj.user/
-*.Rproj
 renv/library/
 
 # ---- 运行输出与临时文件 ----
