@@ -1,30 +1,43 @@
 # ---------------------------------------------------------------------------
 # RStudio 交互版：修改 CONFIG 后直接运行整个脚本
-# 工作目录：项目根目录（打开根目录的 nanoamp.Rproj）
+# 打开 02_code/r/nanoamp.Rproj；脚本会自动向上寻找项目根目录
 # ---------------------------------------------------------------------------
 
+find_project_root <- function(start = getwd()) {
+  p <- normalizePath(start, mustWork = FALSE)
+  repeat {
+    if (dir.exists(file.path(p, "01_data")) || dir.exists(file.path(p, ".git"))) return(p)
+    parent <- dirname(p)
+    if (identical(parent, p)) break
+    p <- parent
+  }
+  normalizePath(start, mustWork = FALSE)
+}
+
+project_root <- find_project_root()
+code_dir <- file.path(project_root, "02_code", "r")
+
 CONFIG <- list(
-  reads = "01_data/ln_test_data/TSM20260826/E4-3/reads.fastq",
-  reference = "01_data/ln_test_data/TSM20260826/E4-3/reference.self.fa",
+  reads = file.path(project_root, "01_data/ln_test_data/TSM20260826/E4-3/reads.fastq"),
+  reference = file.path(project_root, "01_data/ln_test_data/TSM20260826/E4-3/reference.self.fa"),
   mode = "A",
-  outdir = "04_results/rstudio_demo/mode_A_self",
+  outdir = file.path(project_root, "04_results/r/rstudio_demo/mode_A_self"),
   top_n = 20L,
   min_reads = 3L,
   min_freq = 0.02,
   min_identity = 0.90,
   identity_cutoff = 0.99,
   min_cluster_reads = 2L,
-  consensus_method = "medoid",
+  consensus_method = "decipher",
   threads = 4L
 )
 
-code_dir <- "02_code"
 source(file.path(code_dir, "R", "load_all.R"))
 
 if (!file.exists(CONFIG$reads)) {
   stop(paste0(
     "找不到输入文件: ", CONFIG$reads,
-    "\n请确认工作目录是项目根目录，或先运行 scripts/prepare_test_data.R"
+    "\n请先运行 02_code/r/tools/prepare_test_data.R"
   ), call. = FALSE)
 }
 

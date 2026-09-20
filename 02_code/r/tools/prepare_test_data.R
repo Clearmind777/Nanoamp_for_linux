@@ -11,7 +11,7 @@ script_path <- local({
   if (length(a)) sub("^--file=", "", a[1]) else NA_character_
 })
 project_root <- if (!is.na(script_path)) {
-  normalizePath(file.path(dirname(script_path), "..", ".."), mustWork = TRUE)
+  normalizePath(file.path(dirname(script_path), "..", "..", ".."), mustWork = TRUE)
 } else {
   normalizePath(".", mustWork = TRUE)
 }

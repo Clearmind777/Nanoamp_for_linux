@@ -48,24 +48,46 @@ cluster_variant_patterns <- function(read_ids, read_vars, ref_len, identity_cuto
 }
 
 cluster_sequences <- function(seqs, identity_cutoff = 0.99, threads = 4L,
-                              read_ids = NULL, read_vars = NULL, ref_len = NULL) {
+                              read_ids = NULL, read_vars = NULL, ref_len = NULL,
+                              min_coverage = 0.5) {
   n <- length(seqs)
   if (n == 1) {
     return(list(cluster = 1L, distance = matrix(0, 1, 1), method = "single"))
   }
+  cutoff <- 1 - identity_cutoff
   if (requireNamespace("DECIPHER", quietly = TRUE)) {
     ans <- tryCatch({
       x <- Biostrings::DNAStringSet(toupper(seqs))
       names(x) <- sprintf("r%06d", seq_len(n))
       d <- DECIPHER::DistanceMatrix(x, processors = threads, verbose = FALSE)
       dm <- as.matrix(d)
-      cl <- DECIPHER::IdClusters(
-        x, myDistMatrix = d, cutoff = 1 - identity_cutoff,
-        method = "complete", showPlot = FALSE, verbose = FALSE
-      )
-      clv <- if (is.null(dim(cl))) as.integer(cl) else as.integer(cl[, 1])
-      if (!is.null(rownames(cl))) names(clv) <- rownames(cl)
-      list(cluster = clv, distance = dm, method = "DECIPHER::IdClusters")
+      exports <- getNamespaceExports("DECIPHER")
+      if ("Clusterize" %in% exports) {
+        cl <- DECIPHER::Clusterize(
+          x, cutoff = cutoff, minCoverage = min_coverage,
+          processors = threads, verbose = FALSE
+        )
+        clv <- as.integer(cl$cluster)
+        names(clv) <- rownames(cl)
+        clv <- clv[names(x)]
+        method <- "DECIPHER::Clusterize"
+      } else if ("IdClusters" %in% exports) {
+        cl <- DECIPHER::IdClusters(
+          x, myDistMatrix = d, cutoff = cutoff,
+          method = "complete", showPlot = FALSE, verbose = FALSE
+        )
+        clv <- if (is.null(dim(cl))) as.integer(cl) else as.integer(cl[, 1])
+        if (!is.null(rownames(cl))) names(clv) <- rownames(cl)
+        clv <- clv[names(x)]
+        method <- "DECIPHER::IdClusters"
+      } else {
+        hc <- stats::hclust(stats::as.dist(dm), method = "complete")
+        clv <- stats::cutree(hc, h = cutoff)
+        names(clv) <- rownames(dm)
+        clv <- clv[names(x)]
+        method <- "DECIPHER::DistanceMatrix+hclust"
+      }
+      list(cluster = unname(clv), distance = dm, method = method)
     }, error = function(e) {
       log_warn("DECIPHER 聚类失败，降级为贪心聚类: ", conditionMessage(e))
       NULL
@@ -81,25 +103,51 @@ cluster_sequences <- function(seqs, identity_cutoff = 0.99, threads = 4L,
 
 medoid_index <- function(dm, idx) {
   if (length(idx) == 1) return(idx)
+  if (is.null(dm)) return(idx[1])
   sub <- dm[idx, idx, drop = FALSE]
   idx[which.min(rowSums(sub))]
 }
 
+majority_consensus <- function(aln) {
+  m <- as.matrix(aln)
+  n <- ncol(m)
+  out <- character(n)
+  for (j in seq_len(n)) {
+    col <- m[, j]
+    col <- col[col %in% c("A", "C", "G", "T", "-")]
+    if (length(col) == 0) {
+      out[j] <- ""
+      next
+    }
+    tab <- table(col)
+    top <- names(tab)[which.max(tab)]
+    out[j] <- if (top == "-") "" else top
+  }
+  paste0(out, collapse = "")
+}
+
 build_cluster_consensus <- function(seqs, idx, dm,
-                                    method = "medoid", max_msa_seqs = 20L, threads = 4L) {
+                                    method = "decipher", max_msa_seqs = 100L, threads = 4L) {
   if (length(idx) == 1) return(seqs[idx])
-  if (identical(method, "decipher") && length(idx) <= max_msa_seqs &&
-      requireNamespace("DECIPHER", quietly = TRUE)) {
+  if (method %in% c("decipher", "auto") && requireNamespace("DECIPHER", quietly = TRUE)) {
+    sub_idx <- idx
+    if (length(idx) > max_msa_seqs) {
+      med <- medoid_index(dm, idx)
+      pos <- unique(round(seq(1, length(idx), length.out = max_msa_seqs)))
+      sub_idx <- unique(c(med, idx[pos]))
+    }
     ans <- tryCatch({
+      x <- Biostrings::DNAStringSet(toupper(seqs[sub_idx]))
+      names(x) <- sprintf("s%05d", seq_along(sub_idx))
       aln <- DECIPHER::AlignSeqs(
-        Biostrings::DNAStringSet(seqs[idx]),
+        x,
         processors = threads, verbose = FALSE
       )
-      cs <- DECIPHER::ConsensusSequence(
-        aln, threshold = 0.4, ambiguity = FALSE, verbose = FALSE
-      )
-      as.character(cs)
-    }, error = function(e) NULL)
+      majority_consensus(aln)
+    }, error = function(e) {
+      log_warn("DECIPHER 共识失败，改用 medoid: ", conditionMessage(e))
+      NULL
+    })
     if (!is.null(ans) && nzchar(ans)) return(ans)
   }
   seqs[medoid_index(dm, idx)]
@@ -149,7 +197,7 @@ run_mode_b <- function(reads_path, reference_path, outdir,
                        top_n = 20L,
                        identity_cutoff = 0.99, min_cluster_reads = 2L,
                        min_identity = 0.90, min_ref_coverage = 0.90,
-                       max_msa_seqs = 20L, consensus_method = "medoid",
+                       max_msa_seqs = 100L, consensus_method = "decipher",
                        threads = 4L, keep_intermediates = TRUE,
                        ref_label = NULL) {
   outdir <- ensure_dir(outdir)
@@ -255,6 +303,11 @@ run_mode_b <- function(reads_path, reference_path, outdir,
     identity_cutoff = identity_cutoff,
     clustering_method = cl$method,
     consensus_method = consensus_method,
+    decipher_version = if (requireNamespace("DECIPHER", quietly = TRUE)) {
+      as.character(utils::packageVersion("DECIPHER"))
+    } else {
+      NA_character_
+    },
     n_clusters = nrow(clusters),
     n_clusters_passed = sum(clusters$passed_filter),
     top1_proportion = round(clusters$proportion[1], 6),

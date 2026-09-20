@@ -1,90 +1,58 @@
-# nanoamp R 核心算法（v0.1）
+# 02_code 代码目录
 
-本目录是纳米孔 PCR 产物单倍型分析程序的 R 核心实现，对应开发方案第 6 节的三种算法：
+本目录按“共享契约 + 各语言独立实现 + 各交付形态独立子目录”组织，R 版本已实现，Python / CLI / GUI 预留了标准位置。
 
-- **方案 A**：参考引导校正 + 单倍型计数（默认，推荐）
-- **方案 B**：从头聚类 + 簇共识（DECIPHER 优先，缺失时降级为变异模式贪心聚类）
-- **方案 C**：原始 reads 精确匹配（诊断模式）
-
-本轮不包含 Web 版本、GUI、R 包封装和 GTF 功能注释。
-
-## 环境要求
-
-- R >= 4.2
-- R 包：`Biostrings`、`Rsamtools`、`ShortRead`、`data.table`、`optparse`、`jsonlite`、`readxl`
-- 外部命令：`minimap2`、`samtools`
-
-检查环境：
-
-```bash
-Rscript 02_code/scripts/nanoamp.R doctor
+```text
+02_code/
+├── shared/                 # 跨语言共享的参数、输出 schema、接口契约
+│   ├── params/default_params.json
+│   └── docs/output_schema.md
+├── r/                      # R 实现（当前可用）
+│   ├── R/                  # 核心算法模块
+│   ├── scripts/            # RStudio / Rscript 入口
+│   ├── tests/              # testthat 单元测试 + 功能测试
+│   ├── tools/              # 数据准备脚本
+│   ├── config/
+│   └── nanoamp.Rproj
+├── python/                 # Python 实现（待开发）
+│   ├── src/nanoamp/
+│   ├── tests/
+│   └── pyproject.toml
+├── cli/                    # 跨语言命令行契约与发布入口（待开发）
+└── gui/                    # Windows GUI（待开发）
 ```
 
-## 快速开始
+## 设计原则
 
-### RStudio
+1. **算法只实现一次，各形态薄封装**：R 和 Python 可以各自实现，但参数名、输入输出和结果 schema 必须遵循 `shared/` 下的契约，保证同一输入在两种实现下结果可比。
+2. **数据与代码分离**：测试数据在 `01_data/`，运行结果在 `04_results/<language>/...`。
+3. **每个语言目录自包含**：R 项目打开 `02_code/r/nanoamp.Rproj`；Python 项目后续在 `02_code/python/` 下管理虚拟环境和依赖。
+4. **CLI 是统一入口**：GUI 和 Web 最终调用 CLI 或核心库，而不是各自实现一套分析逻辑。
 
-1. 打开项目根目录的 `nanoamp.Rproj`；
-2. 编辑 `02_code/scripts/run_analysis.R` 顶部的 `CONFIG`；
-3. 运行整个脚本。
-
-### 命令行
+## R 版本快速开始
 
 ```bash
-# 单样本
-Rscript 02_code/scripts/nanoamp.R call \
+# 环境检查
+Rscript 02_code/r/scripts/nanoamp.R doctor
+
+# 生成测试数据软链接
+Rscript 02_code/r/tools/prepare_test_data.R
+
+# 单样本分析
+Rscript 02_code/r/scripts/nanoamp.R call \
   --reads 01_data/ln_test_data/TSM20260826/E4-3/reads.fastq \
   --reference 01_data/ln_test_data/TSM20260826/E4-3/reference.self.fa \
   --mode A --top-n 20 \
-  --outdir 04_results/demo/E4-3
+  --outdir 04_results/r/demo/E4-3
 
-# 多样本批处理
-Rscript 02_code/scripts/nanoamp.R batch \
-  --sample-sheet samples.tsv \
-  --mode A --outdir 04_results/batch
+# 单元测试
+Rscript 02_code/r/tests/testthat.R
+
+# 功能测试
+Rscript 02_code/r/tests/run_functional_tests.R \
+  --outdir 04_results/r/test_run_1 --modes A,B,C
 ```
 
-`sample-sheet.tsv` 至少包含 `sample`、`reads`、`reference` 三列。
+RStudio：打开 `02_code/r/nanoamp.Rproj`，编辑并运行 `02_code/r/scripts/run_analysis.R`。
 
-### 测试数据软链接
-
-```bash
-Rscript 02_code/scripts/prepare_test_data.R
-```
-
-该脚本会重建 `01_data/ln_test_data` 下的软链接和 `manifest.tsv`。
-
-### 单元测试与功能测试
-
-```bash
-Rscript 02_code/tests/testthat.R
-Rscript 02_code/tests/run_functional_tests.R --outdir 04_results/test_run_1
-```
-
-## 输出文件
-
-每次运行在 `--outdir` 下生成：
-
-| 文件 | 说明 |
-|---|---|
-| `haplotypes.tsv` | 单倍型排名、reads 数、比例、置信区间、变异描述 |
-| `haplotypes.fasta` | 前 n 条单倍型序列 |
-| `variants.tsv` | 候选变异表；方案 A 列名兼容公司 `*.var.xls` |
-| `qc.tsv` | reads 数、比对率、identity、覆盖度等 QC 指标 |
-| `run_manifest.json` | 参数、参考序列、版本、输入文件 MD5 |
-| `alignments.bam(.bai)` | 方案 A/B 的中间比对文件（可选保留） |
-
-## 默认参数
-
-| 参数 | 默认值 |
-|---|---:|
-| `top_n` | 20 |
-| `min_reads` | 3 |
-| `min_freq` | 0.02 |
-| `min_identity` | 0.90 |
-| `min_ref_coverage` | 0.90 |
-| `homopolymer` | 4 |
-| `strand_bias` | 0.90 |
-| `identity_cutoff`（方案 B） | 0.99 |
-| `min_cluster_reads`（方案 B） | 2 |
-| `threads` | 4 |
+详细说明见 `02_code/r/README.md`；跨语言参数与输出定义见 `02_code/shared/`。

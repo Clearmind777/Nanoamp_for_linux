@@ -1,7 +1,7 @@
 context("核心算法单元测试")
 
 project_root_test_root <- function() {
-  normalizePath(testthat::test_path("..", "..", ".."), mustWork = FALSE)
+  normalizePath(testthat::test_path("..", "..", "..", ".."), mustWork = FALSE)
 }
 
 write_test_fastq <- function(seqs, path, prefix = "r") {
@@ -102,10 +102,15 @@ test_that("方案 B 能对合成数据产生簇并计数", {
   res <- run_mode_b(
     fq, ref_fa, file.path(td, "out"),
     top_n = 5, identity_cutoff = 0.95, min_cluster_reads = 2,
-    min_identity = 0.9, consensus_method = "medoid"
+    min_identity = 0.9, consensus_method = "decipher", max_msa_seqs = 20
   )
   expect_true(nrow(res$haplotypes) >= 1)
   expect_equal(sum(res$haplotypes$count), 13)
+  expect_true(all(nchar(res$haplotypes$consensus) > 0))
+  if (requireNamespace("DECIPHER", quietly = TRUE)) {
+    expect_true(grepl("^DECIPHER", res$qc$clustering_method))
+    expect_equal(res$qc$consensus_method, "decipher")
+  }
 })
 
 test_that("ln_test_data manifest 指向存在的软链接", {

@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ---------------------------------------------------------------------------
 # 基于 ln_test_data 的功能测试：三种模式 × self/wt 参考
-# 结果写入 04_results/test_run_1/
+# 结果写入 04_results/r/test_run_1/
 # ---------------------------------------------------------------------------
 
 suppressPackageStartupMessages({
@@ -13,13 +13,13 @@ suppressPackageStartupMessages({
 })
 
 script_arg <- grep("^--file=", commandArgs(FALSE), value = TRUE)
-script_path <- if (length(script_arg)) sub("^--file=", "", script_arg[1]) else "02_code/tests/run_functional_tests.R"
-project_root <- normalizePath(file.path(dirname(script_path), "..", ".."), mustWork = TRUE)
-code_dir <- file.path(project_root, "02_code")
+script_path <- if (length(script_arg)) sub("^--file=", "", script_arg[1]) else "02_code/r/tests/run_functional_tests.R"
+code_dir <- normalizePath(file.path(dirname(script_path), ".."), mustWork = TRUE)
+project_root <- normalizePath(file.path(code_dir, "..", ".."), mustWork = TRUE)
 source(file.path(code_dir, "R", "load_all.R"))
 
 opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
-  make_option(c("--outdir"), type = "character", default = "04_results/test_run_1"),
+  make_option(c("--outdir"), type = "character", default = "04_results/r/test_run_1"),
   make_option(c("--modes"), type = "character", default = "A,B,C"),
   make_option(c("--datasets"), type = "character", default = "TSM20260826,ZNF8,nano_seq"),
   make_option(c("--samples"), type = "character", default = NULL,
@@ -32,7 +32,7 @@ opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
 
 ln_root <- file.path(project_root, "01_data", "ln_test_data")
 manifest_path <- file.path(ln_root, "manifest.tsv")
-if (!file.exists(manifest_path)) stop("请先运行 02_code/scripts/prepare_test_data.R", call. = FALSE)
+if (!file.exists(manifest_path)) stop("请先运行 02_code/r/tools/prepare_test_data.R", call. = FALSE)
 manifest <- data.table::fread(manifest_path, sep = "\t", header = TRUE)
 
 modes <- strsplit(opt$modes, ",", fixed = TRUE)[[1]]

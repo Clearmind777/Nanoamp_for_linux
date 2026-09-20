@@ -39,7 +39,7 @@ call_options <- function() {
     make_option(c("--min-identity"), type = "double", default = 0.90, help = "read 最低 identity"),
     make_option(c("--identity-cutoff"), type = "double", default = 0.99, help = "方案 B 聚类 identity 阈值"),
     make_option(c("--min-cluster-reads"), type = "integer", default = 2, help = "方案 B 最小簇大小"),
-    make_option(c("--consensus-method"), type = "character", default = "medoid",
+    make_option(c("--consensus-method"), type = "character", default = "decipher",
                 help = "方案 B 共识方法 medoid/decipher"),
     make_option(c("--threads"), type = "integer", default = 4, help = "线程数"),
     make_option(c("--ref-label"), type = "character", default = NULL, help = "参考标签"),
@@ -80,7 +80,7 @@ cmd_batch <- function(args) {
     make_option(c("--min-identity"), type = "double", default = 0.90),
     make_option(c("--identity-cutoff"), type = "double", default = 0.99),
     make_option(c("--min-cluster-reads"), type = "integer", default = 2),
-    make_option(c("--consensus-method"), type = "character", default = "medoid"),
+    make_option(c("--consensus-method"), type = "character", default = "decipher"),
     make_option(c("--no-intermediates"), action = "store_true", default = FALSE)
   )), args = args)
   if (is.null(opt$`sample-sheet`) || is.null(opt$outdir)) {

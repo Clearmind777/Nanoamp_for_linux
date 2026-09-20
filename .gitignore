@@ -29,7 +29,8 @@ renv/library/
 
 # ---- 运行输出与临时文件 ----
 tmp/
-04_results/
+04_results/*
+!04_results/README.md
 *.tmp
 *.log
 
