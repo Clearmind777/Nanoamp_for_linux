@@ -25,10 +25,11 @@ tmp/              临时目录（Git 忽略）
 # 1. 安装 R 包
 R CMD INSTALL 02_code/r
 
-# 2. 环境检查
-nanoamp doctor
-# 或在仓库内：
+# 2. 环境检查（仓库内启动器）
 sh 02_code/cli/nanoamp doctor
+
+# 可选：安装全局 `nanoamp` 命令
+sh 02_code/cli/install_cli.sh ~/.local/bin
 
 # 3. 单样本分析
 sh 02_code/cli/nanoamp call \

@@ -45,8 +45,9 @@ For a double-clickable Windows installer:
 
 1. Build the R package on Windows;
 2. Use RInno to bundle R, the package and its dependencies into one installer;
-3. Bundle `minimap2.exe` and `samtools.exe` (or switch to the planned
-   Rsamtools-only backend) so users do not need to install them separately;
+3. Bundle `minimap2.exe` if native speed is needed. `samtools.exe` is optional
+   because `Rsamtools` handles SAM to BAM conversion; the R-native backend
+   (`aligner = "r"`) needs no external tool at all;
 4. Test on a clean Windows 10/11 machine without R installed.
 
 The RInno skeleton is in `inst/windows/build_installer.R`; it must be run on a

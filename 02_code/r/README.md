@@ -32,10 +32,11 @@ install.packages(c("shiny", "DT"))
 
 ### 2. Install `nanoamp`
 
-From a built tarball:
+From a built tarball (for example the one produced by `make check`; adjust the
+version if needed):
 
 ```r
-install.packages("nanoamp_0.1.0.tar.gz", repos = NULL, type = "source")
+install.packages("05_builds/r/nanoamp_0.1.0.tar.gz", repos = NULL, type = "source")
 ```
 
 From the source directory:
@@ -52,7 +53,9 @@ devtools::install("02_code/r")
 
 ### 3. Install external tools
 
-`minimap2` and `samtools` must be available on `PATH`.
+`minimap2` is resolved from `03_dependence/<os>-<arch>/bin/` first, then from
+`PATH`. `samtools` is optional: SAM to BAM conversion uses
+`Rsamtools::asBam()` by default.
 
 Detailed installation and `PATH` configuration instructions for Linux and
 Windows are in [inst/docs/INSTALL_DEPENDENCIES.md](inst/docs/INSTALL_DEPENDENCIES.md).
@@ -64,7 +67,8 @@ support matrix and the R-native fallback are documented in
 
 ```bash
 minimap2 --version
-samtools --version
+# optional:
+# samtools --version
 ```
 
 Check everything from R:
@@ -161,6 +165,7 @@ nanoamp_defaults()
 | `max_msa_seqs` | 100 | Maximum sequences per consensus alignment |
 | `consensus_method` | `"decipher"` | `"decipher"` or `"medoid"` |
 | `aligner` | `"minimap2"` | `"minimap2"` or `"r"` (R-native fallback) |
+| `use_samtools` | `FALSE` | Use samtools instead of Rsamtools for SAM to BAM |
 | `threads` | 4 | Number of threads |
 | `keep_intermediates` | `TRUE` | Keep BAM and other intermediate files |
 
@@ -234,6 +239,10 @@ sample	reads	reference
 ```
 
 Optional columns: `ref_label`.
+
+Use `--aligner r` to select the R-native alignment backend on platforms
+without minimap2. The repository-level launcher is `02_code/cli/nanoamp`
+(`02_code/cli/nanoamp.bat` on Windows).
 
 ### Install the `nanoamp` command
 
@@ -363,7 +372,7 @@ The package has been verified with `R CMD check` and currently passes with
 | Symptom | Solution |
 |---|---|
 | `minimap2` not found | Install minimap2 and add it to `PATH` |
-| `samtools` not found | Install samtools and add it to `PATH` |
+| `samtools` not found | Usually not needed: `Rsamtools` is the default. Install samtools only if `use_samtools = TRUE` |
 | Mode B is slow | Reduce `max_msa_seqs`, increase `threads`, or use `mode = "A"` |
 | Mode B cannot separate close haplotypes | This is expected below the sequencing error rate; use Mode A |
 | `DECIPHER` not installed | Mode B falls back to greedy clustering; install DECIPHER for better results |

@@ -30,10 +30,10 @@ install.packages(c("shiny", "DT"))
 
 ### 2. 安装 `nanoamp`
 
-从构建好的 tar.gz 安装：
+从构建好的 tar.gz 安装（例如 `make check` 生成的包；版本号按实际情况调整）：
 
 ```r
-install.packages("nanoamp_0.1.0.tar.gz", repos = NULL, type = "source")
+install.packages("05_builds/r/nanoamp_0.1.0.tar.gz", repos = NULL, type = "source")
 ```
 
 从源码目录安装：
@@ -50,7 +50,8 @@ devtools::install("02_code/r")
 
 ### 3. 安装外部工具
 
-`minimap2` 和 `samtools` 必须在 `PATH` 中：
+`minimap2` 会优先从 `03_dependence/<os>-<arch>/bin/` 解析，其次才是 `PATH`。
+`samtools` 不是必需依赖：默认用 `Rsamtools::asBam()` 完成 SAM→BAM。
 
 Linux 和 Windows 下的详细安装与 PATH 配置说明见
 [inst/docs/INSTALL_DEPENDENCIES-CN.md](inst/docs/INSTALL_DEPENDENCIES-CN.md)。
@@ -61,7 +62,8 @@ Linux 和 Windows 下的详细安装与 PATH 配置说明见
 
 ```bash
 minimap2 --version
-samtools --version
+# 可选：
+# samtools --version
 ```
 
 检查环境：
@@ -149,6 +151,7 @@ nanoamp_defaults()
 | `max_msa_seqs` | 100 | 共识比对最多使用多少条序列 |
 | `consensus_method` | `"decipher"` | `"decipher"` 或 `"medoid"` |
 | `aligner` | `"minimap2"` | `"minimap2"` 或 `"r"`（R 内后备） |
+| `use_samtools` | `FALSE` | 是否用 samtools 替代 Rsamtools 完成 SAM→BAM |
 | `threads` | 4 | 线程数 |
 | `keep_intermediates` | `TRUE` | 是否保留 BAM 等中间文件 |
 
@@ -222,6 +225,10 @@ sample	reads	reference
 ```
 
 可选列：`ref_label`。
+
+在没有 minimap2 的平台上，可以用 `--aligner r` 选择 R 内比对后端。
+仓库级启动器是 `02_code/cli/nanoamp`（Windows 下为
+`02_code/cli/nanoamp.bat`）。
 
 ### 安装 `nanoamp` 命令
 
@@ -346,7 +353,7 @@ Rscript 02_code/r/inst/scripts/run_functional_tests.R \
 | 现象 | 解决办法 |
 |---|---|
 | 找不到 `minimap2` | 安装 minimap2 并加入 `PATH` |
-| 找不到 `samtools` | 安装 samtools 并加入 `PATH` |
+| 找不到 `samtools` | 通常不需要：默认使用 `Rsamtools`；只有 `use_samtools = TRUE` 才需要 samtools |
 | 方案 B 太慢 | 降低 `max_msa_seqs`、增加 `threads`，或改用方案 A |
 | 方案 B 分不开相近单倍型 | 这是低于测序错误率时的固有限制，请用方案 A |
 | 没有安装 `DECIPHER` | 方案 B 会自动降级为贪心聚类；建议安装 DECIPHER |

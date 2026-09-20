@@ -26,10 +26,11 @@ tmp/              scratch space (Git ignored)
 # 1. Install the R package
 R CMD INSTALL 02_code/r
 
-# 2. Check the environment
-nanoamp doctor
-# or, from the repository:
+# 2. Check the environment (repository launcher)
 sh 02_code/cli/nanoamp doctor
+
+# Optional: install a global `nanoamp` command
+sh 02_code/cli/install_cli.sh ~/.local/bin
 
 # 3. Run one sample
 sh 02_code/cli/nanoamp call \

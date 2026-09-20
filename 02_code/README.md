@@ -1,24 +1,32 @@
 # 02_code: Source Code
 
 This directory contains the R package, the R-based command line interface and
-the development area for an R-based Windows GUI.
+the R Shiny GUI.
 
 ```text
 02_code/
+|-- README.md / README-CN.md
 |-- shared/                 # Cross-language parameters and output schema
 |   |-- params/default_params.json
 |   `-- docs/output_schema.md
-|-- r/                      # nanoamp R package (available)
+|-- r/                      # nanoamp R package
+|   |-- DESCRIPTION / NAMESPACE / LICENSE
 |   |-- R/
-|   |-- inst/scripts/
-|   |-- tests/
-|   |-- DESCRIPTION
+|   |-- inst/
+|   |   |-- docs/           # dependency installation guides
+|   |   |-- scripts/        # run_analysis.R, CLI and test scripts
+|   |   |-- shiny/          # standalone Shiny entry point
+|   |   `-- windows/        # RInno packaging skeleton
+|   |-- tests/testthat/
+|   |-- exec/nanoamp        # package CLI wrapper
+|   |-- man/                # generated help
 |   `-- README.md / README-CN.md
-|-- cli/                    # CLI contract and wrappers (R based)
-`-- gui/                    # R Shiny GUI (in development)
+|-- cli/                    # repository CLI entry points and launchers
+`-- gui/                    # repository Shiny GUI entry points and launchers
 ```
 
 The Python implementation was cancelled; all current development targets R.
+External tools are bundled under `03_dependence/` at the repository root.
 
 ## Design principles
 
@@ -27,9 +35,11 @@ The Python implementation was cancelled; all current development targets R.
 2. **Shared contracts**: parameter names, defaults and output columns are
    defined once in `shared/`.
 3. **Data and code are separate**: test data lives in `01_data/`; run outputs
-   live in `04_results/r/`.
+   live in `04_results/<front-end>/`.
 4. **Windows first for the GUI**: the GUI is built with Shiny so it runs on
    Windows, Linux and macOS, and can be packaged with RInno later.
+5. **Bundled tools first**: external tools are resolved from
+   `03_dependence/<os>-<arch>/bin/` before `PATH`.
 
 ## R package quick start
 
@@ -37,8 +47,8 @@ The Python implementation was cancelled; all current development targets R.
 # Install the package
 R CMD INSTALL 02_code/r
 
-# Check the environment
-nanoamp doctor
+# Check the environment (repository launcher)
+sh 02_code/cli/nanoamp doctor
 
 # Run one sample
 nanoamp call \
@@ -81,8 +91,8 @@ See `gui/README.md` for the GUI plan, launchers and Windows packaging notes.
 | Component | Status |
 |---|---|
 | R package | Implemented and verified with `R CMD check` (`Status: OK`) |
-| R-based CLI | Implemented (`nanoamp call` / `batch` / `doctor`) |
-| R Shiny GUI | Initial version under development |
+| R-based CLI | Implemented (`nanoamp_cli()` and `02_code/cli`) |
+| R Shiny GUI | Initial version implemented (`nanoamp_gui()` and `02_code/gui`) |
 | Windows installer | Planned via RInno |
 
 External tools are bundled under `03_dependence/`; see `03_dependence/README.md`

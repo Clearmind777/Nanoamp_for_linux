@@ -11,7 +11,9 @@ installer, so end users do not need to install R manually.
 - Windows 10/11 build machine;
 - R and Rtools;
 - the `RInno` package;
-- `minimap2.exe` and `samtools.exe` (bundled separately or available on PATH).
+- `minimap2.exe` (recommended); `samtools.exe` is optional because Rsamtools
+  handles SAM to BAM conversion by default. The R-native backend
+  (`aligner = "r"`) needs no external tool.
 
 ## Steps
 
@@ -20,6 +22,9 @@ installer, so end users do not need to install R manually.
 ```bat
 R CMD build 02_code\r
 R CMD INSTALL nanoamp_0.1.0.tar.gz
+
+:: If the tarball was produced by `make check` on a Unix-like environment:
+:: R CMD INSTALL 05_builds\r\nanoamp_0.1.0.tar.gz
 ```
 
 2. Run the skeleton:

@@ -6,7 +6,7 @@ README.
 ```text
 05_builds/
 `-- r/
-    |-- nanoamp_0.1.0.tar.gz   # R CMD build output
+    |-- nanoamp_<version>.tar.gz   # R CMD build output
     `-- nanoamp.Rcheck/        # R CMD check output
 ```
 

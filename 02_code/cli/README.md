@@ -48,20 +48,23 @@ Optional column: `ref_label`.
 ### Linux / macOS
 
 ```bash
-sh "$(Rscript --vanilla -e 'cat(system.file("scripts", "install_cli.sh", package = "nanoamp"))')" ~/.local/bin
+sh 02_code/cli/install_cli.sh ~/.local/bin
 export PATH="$HOME/.local/bin:$PATH"
 nanoamp doctor
 ```
+
+The installed R package also ships an equivalent script at
+`system.file("scripts", "install_cli.sh", package = "nanoamp")`.
 
 ### Windows
 
 After installing the R package, use one of:
 
 ```bat
-:: Run directly
-Rscript --vanilla -e "library(nanoamp); nanoamp_cli()" call --reads sample.fastq --reference target.fa --outdir results\sampleA
+:: Install a wrapper
+02_code\cli\install_cli.bat %USERPROFILE%\bin
 
-:: Or use the shipped launcher
+:: Or use the repository launcher directly
 02_code\cli\nanoamp.bat call --reads sample.fastq --reference target.fa --outdir results\sampleA
 ```
 
@@ -90,7 +93,7 @@ handled by `Rsamtools` by default.
 | Code | Meaning |
 |---:|---|
 | 0 | Success |
-| 1 | Invalid arguments |
-| 2 | Missing or invalid input file |
-| 3 | Missing external dependency (minimap2 / samtools / DECIPHER) |
-| 4 | Analysis failed |
+| 1 | Any error (invalid arguments, missing input, missing dependency, analysis failure) |
+
+The current implementation uses R error handling, so all failures exit with
+code 1. More granular exit codes are a future improvement.
