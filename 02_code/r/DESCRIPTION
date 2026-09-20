@@ -1,0 +1,32 @@
+Package: nanoamp
+Type: Package
+Title: Nanopore Amplicon Haplotype Analysis
+Version: 0.1.0
+Authors@R: person("nanoamp", "developers",
+    email = "nanoamp@example.com", role = c("aut", "cre"))
+Description: Analyze Oxford Nanopore reads from PCR amplicons, correct
+    sequencing errors, reconstruct haplotypes, and report the top sequences
+    with counts and proportions. Supports reference-guided correction,
+    de novo clustering, and raw exact matching.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends:
+    R (>= 4.2.0)
+Imports:
+    Biostrings,
+    IRanges,
+    Matrix,
+    Rsamtools,
+    ShortRead,
+    data.table,
+    jsonlite,
+    methods,
+    optparse,
+    readxl,
+    stats,
+    utils
+Suggests:
+    DECIPHER,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+RoxygenNote: 7.3.2

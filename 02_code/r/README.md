@@ -1,106 +1,316 @@
-# nanoamp R 实现（v0.2）
+# nanoamp
 
-纳米孔 PCR 产物单倍型分析的 R 实现，对应开发方案第 6 节的三种算法：
+`nanoamp` is an R package for analyzing Oxford Nanopore reads from PCR
+amplicons. It aligns reads to a target sequence, corrects sequencing errors,
+reconstructs haplotypes, and reports the most abundant sequences with counts
+and proportions.
 
-- **方案 A**：参考引导校正 + 单倍型计数（默认，推荐定量）
-- **方案 B**：DECIPHER 聚类 + 簇共识（探索性）
-- **方案 C**：原始 reads 精确匹配（诊断）
+The package is designed for questions such as:
 
-跨语言参数与输出契约见 `02_code/shared/`。
+- How many reads match the intended PCR product exactly?
+- What other sequences are present, and at what proportions?
+- Which variants are real, and which are nanopore sequencing errors?
+- Which haplotype carries which combination of variants?
 
-## 目录
+## Installation
+
+### 1. Install dependencies
+
+```r
+install.packages(c(
+  "Biostrings", "Rsamtools", "ShortRead", "IRanges", "Matrix",
+  "data.table", "optparse", "jsonlite", "readxl"
+))
+
+# Recommended for Mode B (de novo clustering)
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("DECIPHER")
+```
+
+### 2. Install `nanoamp`
+
+From a built tarball:
+
+```r
+install.packages("nanoamp_0.1.0.tar.gz", repos = NULL, type = "source")
+```
+
+From the source directory:
+
+```bash
+R CMD INSTALL 02_code/r
+```
+
+During development:
+
+```r
+devtools::install("02_code/r")
+```
+
+### 3. Install external tools
+
+`minimap2` and `samtools` must be available on `PATH`.
+
+```bash
+minimap2 --version
+samtools --version
+```
+
+Check everything from R:
+
+```r
+library(nanoamp)
+nanoamp::nanoamp_cli("doctor")
+```
+
+## Quick start
+
+```r
+library(nanoamp)
+
+res <- run_haplotype_analysis(
+  reads     = "sample.fastq",
+  reference = "target.fa",
+  outdir    = "results/sampleA",
+  mode      = "A",
+  top_n     = 20
+)
+
+# Top haplotypes
+res$haplotypes
+
+# Candidate variants
+res$variants
+
+# QC metrics
+res$qc
+```
+
+Basic input requirements:
+
+- `reads`: FASTQ or FASTQ.GZ, single-end nanopore reads;
+- `reference`: FASTA containing the intended amplicon sequence;
+- `outdir`: output directory (created automatically).
+
+## Analysis modes
+
+### Mode A: reference-guided correction (recommended)
+
+Mode A aligns reads to the target sequence, discovers candidate variants,
+treats differences that do not pass the variant filters as sequencing errors,
+and groups reads by their corrected sequence.
+
+Use Mode A when:
+
+- a reliable target sequence is available;
+- you need quantitative haplotype proportions;
+- you want to distinguish real variants from nanopore errors.
+
+### Mode B: de novo clustering (exploratory)
+
+Mode B clusters reads with `DECIPHER::Clusterize` and builds a polished
+consensus for each cluster using `DECIPHER::AlignSeqs` followed by majority
+voting.
+
+Use Mode B when:
+
+- no reliable reference is available;
+- you want a data-driven overview of the main sequence groups;
+- you accept that haplotypes differing by less than the sequencing error rate
+  may not be resolved.
+
+If `DECIPHER` is unavailable, Mode B falls back to variant-pattern greedy
+clustering and records this in `qc.tsv`.
+
+### Mode C: raw exact matching (diagnostic)
+
+Mode C counts raw reads that match the reference exactly on either strand. It
+is useful for demonstrating the effect of nanopore errors, but it is not
+recommended for quantitative haplotype analysis.
+
+## Parameters
+
+Default parameters can be inspected with:
+
+```r
+nanoamp_defaults()
+```
+
+| Parameter | Default | Description |
+|---|---:|---|
+| `top_n` | 20 | Number of top haplotypes to report |
+| `min_reads` | 3 | Minimum supporting reads for a candidate variant |
+| `min_freq` | 0.02 | Minimum variant frequency |
+| `min_identity` | 0.90 | Minimum read identity to the reference |
+| `min_ref_coverage` | 0.90 | Minimum fraction of the reference covered by a read |
+| `homopolymer` | 4 | Homopolymer length threshold for filtering |
+| `strand_bias` | 0.90 | Strand bias threshold |
+| `identity_cutoff` | 0.99 | Mode B clustering identity cutoff |
+| `min_cluster_reads` | 2 | Mode B minimum cluster size |
+| `max_msa_seqs` | 100 | Maximum sequences per consensus alignment |
+| `consensus_method` | `"decipher"` | `"decipher"` or `"medoid"` |
+| `threads` | 4 | Number of threads |
+| `keep_intermediates` | `TRUE` | Keep BAM and other intermediate files |
+
+## Output files
 
 ```text
-02_code/r/
-├── R/                      # 核心算法模块
-├── scripts/
-│   ├── run_analysis.R      # RStudio 交互入口
-│   └── nanoamp.R           # Rscript CLI
-├── tests/
-│   ├── testthat.R
-│   ├── testthat/test-core.R
-│   └── run_functional_tests.R
-├── tools/prepare_test_data.R
-├── config/default_params.R
-└── nanoamp.Rproj
+outdir/
+├── haplotypes.tsv
+├── haplotypes.fasta
+├── variants.tsv
+├── qc.tsv
+├── run_manifest.json
+└── alignments.bam(.bai)     # Modes A and B, when keep_intermediates = TRUE
 ```
 
-## 环境要求
+### haplotypes.tsv
 
-- R >= 4.2
-- R 包：`Biostrings`、`Rsamtools`、`ShortRead`、`data.table`、`optparse`、`jsonlite`、`readxl`
-- 外部命令：`minimap2`、`samtools`
-- 方案 B 推荐：`DECIPHER`（2.26.0 已验证）
-
-```bash
-Rscript 02_code/r/scripts/nanoamp.R doctor
-```
-
-## 快速开始
-
-### RStudio
-
-1. 打开 `02_code/r/nanoamp.Rproj`；
-2. 编辑 `02_code/r/scripts/run_analysis.R` 顶部的 `CONFIG`；
-3. 运行整个脚本。脚本会自动向上寻找项目根目录。
-
-### 命令行
-
-```bash
-# 单样本
-Rscript 02_code/r/scripts/nanoamp.R call \
-  --reads 01_data/ln_test_data/TSM20260826/E4-3/reads.fastq \
-  --reference 01_data/ln_test_data/TSM20260826/E4-3/reference.self.fa \
-  --mode A --top-n 20 \
-  --outdir 04_results/r/demo/E4-3
-
-# 方案 B（DECIPHER）
-Rscript 02_code/r/scripts/nanoamp.R call \
-  --reads 01_data/ln_test_data/TSM20260826/E4-3/reads.fastq \
-  --reference 01_data/ln_test_data/TSM20260826/E4-3/reference.self.fa \
-  --mode B --consensus-method decipher \
-  --outdir 04_results/r/demo/E4-3_modeB
-
-# 批处理
-Rscript 02_code/r/scripts/nanoamp.R batch \
-  --sample-sheet samples.tsv --mode A --outdir 04_results/r/batch
-```
-
-### 测试
-
-```bash
-# 生成软链接测试数据
-Rscript 02_code/r/tools/prepare_test_data.R
-
-# 单元测试
-Rscript 02_code/r/tests/testthat.R
-
-# 功能测试
-Rscript 02_code/r/tests/run_functional_tests.R \
-  --outdir 04_results/r/test_run_1 --modes A,B,C --threads 4
-```
-
-## 方案 B：DECIPHER 实现
-
-流程：
-
-1. 比对到参考，统一方向并截取扩增子区段；
-2. 重建每条 read 的序列（保留全部差异，不做频率过滤）；
-3. `DECIPHER::DistanceMatrix` 计算序列距离；
-4. `DECIPHER::Clusterize` 按 `identity_cutoff`（默认 0.99）聚类；
-5. 每个簇用 `DECIPHER::AlignSeqs` 做多序列比对，再用多数投票生成无 gap 共识；
-6. 大簇超过 `max_msa_seqs`（默认 100）时，保留 medoid 并系统抽样后再比对；
-7. 对通过 `min_cluster_reads` 的簇，用 `pairwiseAlignment` 描述其相对参考的差异。
-
-若 DECIPHER 不可用，自动降级为“变异模式贪心聚类”，并在 `qc.tsv` 的 `clustering_method` 中记录。
-
-## 输出
-
-| 文件 | 说明 |
+| Column | Description |
 |---|---|
-| `haplotypes.tsv` | 单倍型排名、reads 数、比例、置信区间、变异描述 |
-| `haplotypes.fasta` | 前 n 条单倍型序列 |
-| `variants.tsv` | 候选变异表；方案 A 列名兼容公司 `*.var.xls` |
-| `qc.tsv` | reads 数、比对率、identity、覆盖度、聚类/共识方法 |
-| `run_manifest.json` | 参数、参考序列、版本、输入文件 MD5 |
-| `alignments.bam(.bai)` | 方案 A/B 中间比对文件（可选保留） |
+| `rank` | Rank by supporting read count |
+| `haplotype_id` / `cluster_id` | Haplotype or cluster identifier |
+| `count` | Supporting reads |
+| `proportion` | Fraction of assigned reads |
+| `ci_low`, `ci_high` | 95% Wilson confidence interval |
+| `is_reference` | Whether the sequence matches the reference |
+| `n_snv`, `n_ins`, `n_del` | Number of variants |
+| `length` | Haplotype length |
+| `variants` | Variant description; `.` means no variant |
+
+### variants.tsv
+
+Mode A uses a company-compatible layout:
+
+```text
+Chr  Pos  Ref  Alt  DP  Ref_dp  Alt_dp  Freq  DP4  Seq  Filter_Status  Filter_Reason
+```
+
+- `Freq` is a fraction between 0 and 1;
+- `-` in `Ref` or `Alt` represents an insertion or deletion;
+- `Filter_Status` is `PASS` or `FILTERED`.
+
+### qc.tsv
+
+Two columns, `metric` and `value`, including read counts, mapping rate, mean
+identity, coverage, clustering method, consensus method, and DECIPHER version.
+
+## Command line interface
+
+The package ships a CLI based on the same R code.
+
+```bash
+nanoamp doctor
+
+nanoamp call \
+  --reads sample.fastq \
+  --reference target.fa \
+  --mode A \
+  --top-n 20 \
+  --outdir results/sampleA
+
+nanoamp batch \
+  --sample-sheet samples.tsv \
+  --mode A \
+  --outdir results/batch
+```
+
+The batch sample sheet is a TSV with at least:
+
+```text
+sample	reads	reference
+```
+
+Optional columns: `ref_label`.
+
+### Install the `nanoamp` command
+
+```bash
+sh "$(Rscript --vanilla -e 'cat(system.file("scripts", "install_cli.sh", package = "nanoamp"))')" ~/.local/bin
+export PATH="$HOME/.local/bin:$PATH"
+nanoamp doctor
+```
+
+Alternatively, call the CLI directly from R:
+
+```r
+library(nanoamp)
+nanoamp_cli(c("call", "--reads", "sample.fastq", "--reference", "target.fa",
+              "--outdir", "results/sampleA"))
+```
+
+## RStudio workflow
+
+1. Open `02_code/r/nanoamp.Rproj`.
+2. Edit the `CONFIG` block in `inst/scripts/run_analysis.R`.
+3. Run the whole script.
+
+The script locates the repository root automatically and writes results under
+`04_results/r/`.
+
+## Using the test data
+
+The repository ships a normalized symlink layer:
+
+```bash
+Rscript 02_code/r/inst/scripts/prepare_test_data.R
+```
+
+This creates `01_data/ln_test_data/<dataset>/<sample>/` with:
+
+```text
+reads.fastq
+reference.self.fa
+reference.wt.fa
+consensus.N.fa
+variants.N.xlsx
+sanger.N.ab1
+meta.tsv
+```
+
+Example:
+
+```r
+library(nanoamp)
+res <- run_haplotype_analysis(
+  reads     = "01_data/ln_test_data/TSM20260826/E4-3/reads.fastq",
+  reference = "01_data/ln_test_data/TSM20260826/E4-3/reference.self.fa",
+  outdir    = "04_results/r/demo/E4-3",
+  mode      = "A"
+)
+```
+
+## Tests and verification
+
+```r
+# Unit tests
+testthat::test_check("nanoamp")   # from an installed package
+
+# Or during development
+devtools::test("02_code/r")
+```
+
+Full functional test across datasets:
+
+```bash
+Rscript 02_code/r/inst/scripts/run_functional_tests.R \
+  --outdir 04_results/r/test_run_2 --modes A,B,C --threads 4
+```
+
+The package has been verified with `R CMD check` and currently passes with
+`Status: OK`.
+
+## Troubleshooting
+
+| Symptom | Solution |
+|---|---|
+| `minimap2` not found | Install minimap2 and add it to `PATH` |
+| `samtools` not found | Install samtools and add it to `PATH` |
+| Mode B is slow | Reduce `max_msa_seqs`, increase `threads`, or use `mode = "A"` |
+| Mode B cannot separate close haplotypes | This is expected below the sequencing error rate; use Mode A |
+| `DECIPHER` not installed | Mode B falls back to greedy clustering; install DECIPHER for better results |
+| All proportions are low in Mode C | Nanopore reads contain errors; use Mode A |
+
+## License
+
+MIT.

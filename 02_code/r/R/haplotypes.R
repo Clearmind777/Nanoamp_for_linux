@@ -1,7 +1,34 @@
 # ---------------------------------------------------------------------------
-# 统一调度入口
+# Unified analysis dispatcher
 # ---------------------------------------------------------------------------
 
+#' Analyze nanopore amplicon haplotypes
+#'
+#' Align reads to a target sequence, correct sequencing errors, reconstruct
+#' haplotypes, and report the top sequences with counts and proportions.
+#'
+#' @param reads Path to an input FASTQ file.
+#' @param reference Path to a target sequence FASTA file.
+#' @param outdir Output directory.
+#' @param mode Analysis mode: `"A"` reference-guided correction (default),
+#'   `"B"` de novo clustering, or `"C"` raw exact matching.
+#' @param top_n Number of top haplotypes to report.
+#' @param min_reads Minimum supporting reads for a candidate variant.
+#' @param min_freq Minimum frequency for a candidate variant.
+#' @param min_identity Minimum read identity to the reference.
+#' @param min_ref_coverage Minimum fraction of the reference covered by a read.
+#' @param homopolymer Homopolymer length threshold used for filtering.
+#' @param strand_bias Strand bias filter threshold.
+#' @param identity_cutoff Mode B clustering identity cutoff.
+#' @param min_cluster_reads Mode B minimum cluster size.
+#' @param max_msa_seqs Maximum number of sequences used for consensus alignment.
+#' @param consensus_method Mode B consensus method, `"decipher"` or `"medoid"`.
+#' @param threads Number of threads.
+#' @param keep_intermediates Keep BAM and other intermediate files.
+#' @param ref_label Optional reference label used in outputs.
+#'
+#' @return A list with `haplotypes`, `variants` and `qc` elements.
+#' @export
 run_haplotype_analysis <- function(reads, reference, outdir,
                                    mode = c("A", "B", "C"),
                                    top_n = 20L,

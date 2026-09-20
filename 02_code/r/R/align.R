@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# minimap2 比对与 BAM 解析
+# minimap2 alignment and BAM parsing
 # ---------------------------------------------------------------------------
 
 align_reads <- function(reads_path, reference_path, out_bam,
@@ -19,7 +19,8 @@ align_reads <- function(reads_path, reference_path, out_bam,
   )
   status <- system(cmd)
   if (status != 0 || !file.exists(out_bam)) {
-    stop(sprintf("minimap2/samtools 比对失败，退出码 %s", status), call. = FALSE)
+    stop(sprintf("minimap2/samtools alignment failed with exit code %s", status),
+         call. = FALSE)
   }
   system2(samtools_bin, c("index", shQuote(out_bam)), stdout = FALSE, stderr = FALSE)
   out_bam

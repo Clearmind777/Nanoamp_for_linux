@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# 方案 B：从头聚类 + 簇共识
+# Mode B: de novo clustering and cluster consensus
 # ---------------------------------------------------------------------------
 
 greedy_cluster_from_distance <- function(dm, cutoff) {
@@ -72,7 +72,8 @@ cluster_sequences <- function(seqs, identity_cutoff = 0.99, threads = 4L,
         clv <- clv[names(x)]
         method <- "DECIPHER::Clusterize"
       } else if ("IdClusters" %in% exports) {
-        cl <- DECIPHER::IdClusters(
+        id_clusters <- getExportedValue("DECIPHER", "IdClusters")
+        cl <- id_clusters(
           x, myDistMatrix = d, cutoff = cutoff,
           method = "complete", showPlot = FALSE, verbose = FALSE
         )
@@ -89,16 +90,18 @@ cluster_sequences <- function(seqs, identity_cutoff = 0.99, threads = 4L,
       }
       list(cluster = unname(clv), distance = dm, method = method)
     }, error = function(e) {
-      log_warn("DECIPHER 聚类失败，降级为贪心聚类: ", conditionMessage(e))
+      log_warn("DECIPHER clustering failed; falling back to greedy clustering: ",
+               conditionMessage(e))
       NULL
     })
     if (!is.null(ans)) return(ans)
   }
   if (!is.null(read_ids) && !is.null(read_vars)) {
-    log_warn("DECIPHER 不可用，方案 B 使用变异模式贪心聚类")
+    log_warn("DECIPHER unavailable; Mode B uses variant-pattern greedy clustering")
     return(cluster_variant_patterns(read_ids, read_vars, ref_len, identity_cutoff))
   }
-  stop("DECIPHER 不可用且没有提供 read_vars，无法进行方案 B 聚类", call. = FALSE)
+  stop("DECIPHER unavailable and read_vars not supplied; cannot cluster for Mode B",
+       call. = FALSE)
 }
 
 medoid_index <- function(dm, idx) {
@@ -145,7 +148,7 @@ build_cluster_consensus <- function(seqs, idx, dm,
       )
       majority_consensus(aln)
     }, error = function(e) {
-      log_warn("DECIPHER 共识失败，改用 medoid: ", conditionMessage(e))
+      log_warn("DECIPHER consensus failed; using medoid: ", conditionMessage(e))
       NULL
     })
     if (!is.null(ans) && nzchar(ans)) return(ans)
@@ -203,15 +206,15 @@ run_mode_b <- function(reads_path, reference_path, outdir,
   outdir <- ensure_dir(outdir)
   ref <- read_reference(reference_path)
   n_total <- count_fastq_reads(reads_path)
-  log_info("方案 B: ", basename(reads_path), " -> ", ref$name, " (", n_total, " reads)")
+  log_info("Mode B: ", basename(reads_path), " -> ", ref$name, " (", n_total, " reads)")
 
   bam <- file.path(outdir, "alignments.bam")
   align_reads(reads_path, reference_path, bam, threads = threads)
   aln <- prepare_alignment_stats(parse_alignments(bam), ref$length)
   n_primary <- nrow(aln)
-  if (n_primary == 0) stop("方案 B: 没有比对上的 reads", call. = FALSE)
+  if (n_primary == 0) stop("Mode B: no aligned reads", call. = FALSE)
   kept <- filter_alignment_reads(aln, min_identity, min_ref_coverage)
-  if (nrow(kept) == 0) stop("方案 B: 过滤后没有可用 reads", call. = FALSE)
+  if (nrow(kept) == 0) stop("Mode B: no reads left after filtering", call. = FALSE)
 
   read_vars <- extract_read_variants(kept)
   seqs <- vapply(seq_len(nrow(kept)), function(i) {

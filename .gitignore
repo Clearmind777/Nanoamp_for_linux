@@ -37,3 +37,7 @@ tmp/
 # ---- 大型中间文件（test_data 暂作为固定测试集保留在 Git 中）----
 *.bam.bai.tmp
 *.fastq.gz.tmp
+
+# ---- R 构建产物 ----
+*.Rcheck/
+nanoamp_*.tar.gz

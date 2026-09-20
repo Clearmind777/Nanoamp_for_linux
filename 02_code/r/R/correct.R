@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# 方案 A：参考引导校正 + 单倍型计数
+# Mode A: reference-guided correction and haplotype counting
 # ---------------------------------------------------------------------------
 
 empty_ops <- function() {
@@ -123,17 +123,17 @@ run_mode_a <- function(reads_path, reference_path, outdir,
   outdir <- ensure_dir(outdir)
   ref <- read_reference(reference_path)
   n_total <- count_fastq_reads(reads_path)
-  log_info("方案 A: ", basename(reads_path), " -> ", ref$name, " (", n_total, " reads)")
+  log_info("Mode A: ", basename(reads_path), " -> ", ref$name, " (", n_total, " reads)")
 
   bam <- file.path(outdir, "alignments.bam")
   align_reads(reads_path, reference_path, bam, threads = threads)
   aln <- prepare_alignment_stats(parse_alignments(bam), ref$length)
   n_primary <- nrow(aln)
-  if (n_primary == 0) stop("方案 A: 没有比对上的 reads", call. = FALSE)
+  if (n_primary == 0) stop("Mode A: no aligned reads", call. = FALSE)
 
   kept <- filter_alignment_reads(aln, min_identity, min_ref_coverage)
-  if (nrow(kept) == 0) stop("方案 A: 过滤后没有可用 reads", call. = FALSE)
-  log_info("方案 A: 保留 ", nrow(kept), "/", n_primary, " 条比对 reads")
+  if (nrow(kept) == 0) stop("Mode A: no reads left after filtering", call. = FALSE)
+  log_info("Mode A: kept ", nrow(kept), "/", n_primary, " aligned reads")
 
   disc <- discover_variants(
     kept, ref$sequence,

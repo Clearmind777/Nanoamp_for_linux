@@ -1,17 +1,21 @@
 # ---------------------------------------------------------------------------
-# 通用工具函数
+# General utility functions
 # ---------------------------------------------------------------------------
 
 `%||%` <- function(x, y) {
   if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
 }
 
+#' nanoamp version
+#'
+#' @return A version string.
+#' @export
 nanoamp_version <- function() "0.1.0"
 
 log_msg <- function(level, ...) {
   msg <- paste0(...)
   cat(sprintf("[%s] %-5s %s\n", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), level, msg))
-  flush.console()
+  utils::flush.console()
 }
 
 log_info <- function(...) log_msg("INFO", ...)
@@ -33,8 +37,8 @@ require_packages <- function(pkgs, strict = TRUE) {
   missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing) > 0) {
     msg <- paste0(
-      "缺少 R 包: ", paste(missing, collapse = ", "),
-      "。请先安装，例如 BiocManager::install(c(",
+      "Missing R packages: ", paste(missing, collapse = ", "),
+      ". Please install them, for example BiocManager::install(c(",
       paste(sprintf('"%s"', missing), collapse = ", "), "))"
     )
     if (strict) stop(msg, call. = FALSE)
@@ -46,7 +50,8 @@ require_packages <- function(pkgs, strict = TRUE) {
 check_external_tool <- function(tool) {
   path <- Sys.which(tool)
   if (!nzchar(path)) {
-    stop(sprintf("找不到外部命令 %s，请先安装并加入 PATH。", tool), call. = FALSE)
+    stop(sprintf("External command not found: %s. Please install it and add it to PATH.",
+                 tool), call. = FALSE)
   }
   unname(path)
 }

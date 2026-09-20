@@ -10,13 +10,28 @@ suppressPackageStartupMessages({
   library(Rsamtools)
   library(ShortRead)
   library(optparse)
+  library(nanoamp)
 })
 
+find_project_root <- function(start = getwd()) {
+  p <- normalizePath(start, mustWork = FALSE)
+  repeat {
+    if (dir.exists(file.path(p, "01_data")) || dir.exists(file.path(p, ".git"))) return(p)
+    parent <- dirname(p)
+    if (identical(parent, p)) break
+    p <- parent
+  }
+  normalizePath(start, mustWork = FALSE)
+}
+
 script_arg <- grep("^--file=", commandArgs(FALSE), value = TRUE)
-script_path <- if (length(script_arg)) sub("^--file=", "", script_arg[1]) else "02_code/r/tests/run_functional_tests.R"
-code_dir <- normalizePath(file.path(dirname(script_path), ".."), mustWork = TRUE)
-project_root <- normalizePath(file.path(code_dir, "..", ".."), mustWork = TRUE)
-source(file.path(code_dir, "R", "load_all.R"))
+script_path <- if (length(script_arg)) sub("^--file=", "", script_arg[1]) else NA_character_
+start_dir <- if (!is.na(script_path)) dirname(script_path) else getwd()
+project_root <- find_project_root(start_dir)
+
+`%||%` <- function(x, y) {
+  if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
+}
 
 opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
   make_option(c("--outdir"), type = "character", default = "04_results/r/test_run_1"),
@@ -32,7 +47,9 @@ opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
 
 ln_root <- file.path(project_root, "01_data", "ln_test_data")
 manifest_path <- file.path(ln_root, "manifest.tsv")
-if (!file.exists(manifest_path)) stop("请先运行 02_code/r/tools/prepare_test_data.R", call. = FALSE)
+if (!file.exists(manifest_path)) {
+  stop("请先运行 02_code/r/inst/scripts/prepare_test_data.R", call. = FALSE)
+}
 manifest <- data.table::fread(manifest_path, sep = "\t", header = TRUE)
 
 modes <- strsplit(opt$modes, ",", fixed = TRUE)[[1]]
@@ -107,7 +124,7 @@ read_our_variants <- function(path) {
 }
 
 read_company_variant_dt <- function(path, min_freq = 5) {
-  cv <- read_company_variants(path)
+  cv <- nanoamp:::read_company_variants(path)
   if (is.null(cv) || nrow(cv) == 0) return(NULL)
   cv <- cv[!is.na(company_pos)]
   if (any(!is.na(cv$company_freq))) cv <- cv[is.na(company_freq) | company_freq >= min_freq]
@@ -211,8 +228,8 @@ for (i in seq_len(nrow(targets))) {
         overlap_keys = cmp$desc,
         error = err
       )
-      log_info(sprintf("完成 %s/%s mode=%s ref=%s status=%s %.1fs",
-                       ds, sp, mode, ref_label, status, elapsed))
+      nanoamp:::log_info(sprintf("完成 %s/%s mode=%s ref=%s status=%s %.1fs",
+                                 ds, sp, mode, ref_label, status, elapsed))
     }
   }
 }

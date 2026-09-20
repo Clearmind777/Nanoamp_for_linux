@@ -10,11 +10,20 @@ script_path <- local({
   a <- grep("^--file=", commandArgs(FALSE), value = TRUE)
   if (length(a)) sub("^--file=", "", a[1]) else NA_character_
 })
-project_root <- if (!is.na(script_path)) {
-  normalizePath(file.path(dirname(script_path), "..", "..", ".."), mustWork = TRUE)
-} else {
-  normalizePath(".", mustWork = TRUE)
+
+find_project_root <- function(start = getwd()) {
+  p <- normalizePath(start, mustWork = FALSE)
+  repeat {
+    if (dir.exists(file.path(p, "01_data")) || dir.exists(file.path(p, ".git"))) return(p)
+    parent <- dirname(p)
+    if (identical(parent, p)) break
+    p <- parent
+  }
+  normalizePath(start, mustWork = FALSE)
 }
+
+start_dir <- if (!is.na(script_path)) dirname(script_path) else getwd()
+project_root <- find_project_root(start_dir)
 
 test_dir <- file.path(project_root, "01_data", "test_data")
 ln_dir <- file.path(project_root, "01_data", "ln_test_data")

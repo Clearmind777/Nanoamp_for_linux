@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# cs tag 解析、候选变异发现与过滤
+# cs tag parsing, candidate variant discovery and filtering
 # ---------------------------------------------------------------------------
 
 cs_to_variants <- function(cs, ref_start, strand = "+", read_id = NA_character_) {
@@ -192,20 +192,20 @@ discover_variants <- function(aln, ref_seq,
 
   agg[support < min_reads, `:=`(
     Filter_Status = "FILTERED",
-    Filter_Reason = sprintf("支持 reads 数 < %d", min_reads)
+    Filter_Reason = sprintf("supporting reads < %d", min_reads)
   )]
   agg[Filter_Status == "PASS" & freq < min_freq, `:=`(
     Filter_Status = "FILTERED",
-    Filter_Reason = sprintf("频率 < %.1f%%", min_freq * 100)
+    Filter_Reason = sprintf("frequency < %.1f%%", min_freq * 100)
   )]
   agg[Filter_Status == "PASS" & plus > 0 & minus > 0 &
         pmin(plus, minus) / support < (1 - strand_bias), `:=`(
     Filter_Status = "FILTERED",
-    Filter_Reason = "链偏好"
+    Filter_Reason = "strand bias"
   )]
   agg[Filter_Status == "PASS" & hp_run >= homopolymer & freq < 0.5, `:=`(
     Filter_Status = "FILTERED",
-    Filter_Reason = sprintf("poly 结构长度 >= %d bp 且频率较低", homopolymer)
+    Filter_Reason = sprintf("homopolymer length >= %d bp with low frequency", homopolymer)
   )]
 
   agg[, Seq := mapply(

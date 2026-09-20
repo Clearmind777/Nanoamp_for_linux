@@ -15,7 +15,6 @@ find_project_root <- function(start = getwd()) {
 }
 
 project_root <- find_project_root()
-code_dir <- file.path(project_root, "02_code", "r")
 
 CONFIG <- list(
   reads = file.path(project_root, "01_data/ln_test_data/TSM20260826/E4-3/reads.fastq"),
@@ -32,12 +31,16 @@ CONFIG <- list(
   threads = 4L
 )
 
-source(file.path(code_dir, "R", "load_all.R"))
+if (!requireNamespace("nanoamp", quietly = TRUE)) {
+  stop("The nanoamp R package is not installed. Run: R CMD INSTALL 02_code/r",
+       call. = FALSE)
+}
+suppressPackageStartupMessages(library(nanoamp))
 
 if (!file.exists(CONFIG$reads)) {
   stop(paste0(
     "找不到输入文件: ", CONFIG$reads,
-    "\n请先运行 02_code/r/tools/prepare_test_data.R"
+    "\n请先运行 02_code/r/inst/scripts/prepare_test_data.R"
   ), call. = FALSE)
 }
 

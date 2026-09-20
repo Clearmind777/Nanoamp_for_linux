@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# 方案 C：原始 reads 精确匹配（诊断模式）
+# Mode C: raw exact matching (diagnostic mode)
 # ---------------------------------------------------------------------------
 
 run_mode_c <- function(reads_path, reference_path, outdir,
@@ -8,8 +8,8 @@ run_mode_c <- function(reads_path, reference_path, outdir,
   outdir <- ensure_dir(outdir)
   ref <- read_reference(reference_path)
   fq <- read_fastq(reads_path)
-  log_info("方案 C: ", basename(reads_path), " -> ", ref$name, " (", nrow(fq), " reads)")
-  if (nrow(fq) == 0) stop("方案 C: FASTQ 为空", call. = FALSE)
+  log_info("Mode C: ", basename(reads_path), " -> ", ref$name, " (", nrow(fq), " reads)")
+  if (nrow(fq) == 0) stop("Mode C: FASTQ is empty", call. = FALSE)
 
   ref_rc <- reverse_complement(ref$sequence)
   exact_fwd <- fq$sequence == ref$sequence
