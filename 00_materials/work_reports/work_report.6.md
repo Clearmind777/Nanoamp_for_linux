@@ -346,6 +346,90 @@ Mode B 的平均 top1 占比在两次运行间有极小抖动（0.7286 vs 0.7281
 
 ---
 
+## 8. 附：离线安装包预置（`03_dependence/offline-bundle/`）
+
+应"能否把 R、编译链、外部依赖的安装程序都预置在本项目中"的问题，做了一版
+可复现的离线安装包方案并验证通过。
+
+### 8.1 结论
+
+**技术上可以，已经实现并验证；但安装程序本身不应提交进 Git 历史。**
+因此仓库保存"配方 + 校验和"，291 MB 的安装包落在 git 忽略的 `dist/`。
+
+### 8.2 体积构成
+
+| 组成 | 体积 | 说明 |
+|---|---:|---|
+| `R-4.6.1-win.exe` | 87.5 MB | R 安装器 |
+| `r-packages/` | 152.1 MB | 109 个 R 包二进制 + PACKAGES 索引 |
+| `msys2/` | 51.3 MB | 便携工具链（用于重建 minimap2） |
+| `src/` | 0.3 MB | minimap2 v2.31 源码 |
+| **合计** | **291.1 MB** | 已有 `SOURCES.tsv` + `SHA256SUMS.txt` |
+
+作为对比：仓库当前 `.git` 为 65.7 MB；R 安装后约 430 MB（运行时 533 MB 中
+含库 343 MB）；MSYS2 安装后 1.5 GB。
+
+### 8.3 为什么安装包不入库
+
+1. **GitHub 硬限制**：单文件超过 100 MiB 直接拒绝推送，超过 50 MiB 警告。
+   R 安装器 87.5 MB，已在警告区、逼近硬限，R 一升级就可能推不上去。
+2. **历史不可回收**：`git rm` 不释放空间，blob 永久留在历史里，此后每次
+   clone 都要付这 291 MB（叠加现有 65.7 MB）。
+3. **Git LFS 免费额度不够**：免费层 1 GB 存储 + 1 GB/月流量，291 MB 一次就
+   吃掉很大比例；而且 LFS 走 `github.com`，正是当前被 reset 的那个通道。
+4. **再分发与许可证**：R / Rtools / MSYS2 属 GPL 系，109 个包各有许可证；
+   把二进制放进仓库就等于承担再分发义务，必须随附全部许可证文本。
+   构建时下载则完全绕开这个问题。
+5. **立刻过期**：提交进去的安装器在 R 或 Bioconductor 发新版当天就失效；
+   固定版本的配方 + 哈希不会。
+
+### 8.4 真要做到"自带"
+
+把 `dist` 指到仓库之外即可得到可 USB 拷贝的自包含目录：
+
+```powershell
+Rscript 03_dependence/offline-bundle/fetch_offline_bundle.R D:\nanoamp-offline
+```
+
+若要放进仓库，可在 `.gitignore` 加 `!dist/` 例外（但第 1–4 条限制依旧，
+推送很可能被拒）。更适合的托管方式是发布为 GitHub **release assets**：
+专为大二进制设计、不计入仓库体积、clone 不受影响——但上传同样需要当前
+被阻断的推送权限（见第 2 节与文末）。
+
+### 8.5 包集合是"算"出来的，不是手写的
+
+脚本递归解析 `Depends` / `Imports` / `LinkingTo` 闭包并**迭代到闭合**，
+因为新加入的包会带来自己的依赖（如 `futile.logger` 需要 `lambda.r` 和
+`futile.options`）。最终 109 个包，输出 `complete` 或明确列出缺口。
+
+### 8.6 离线验证（决定性证据）
+
+把 `http_proxy` / `https_proxy` 指向死端口，使任何联网尝试立即失败，
+且只让安装包提供的库可见：
+
+```text
+bundle packages visible   : 109
+installed package dirs    : 109     （generics / png 等 19 个此前缺失的包已补齐）
+nanoamp CMD INSTALL       : DONE
+testthat                  : 34 passed, 0 failed, 0 errors, 0 skipped
+functional (Mode A E4-3)  : 2/2 ok, mean_overlap 1.0
+```
+
+### 8.7 踩到的两个 R 行为（已写入文档）
+
+1. **`contriburl=` 与 `repos=` 对本地仓库根不通用**：
+   `repos="file:///<root>"` 会解析 `<root>/bin/windows/contrib/<rver>/PACKAGES`；
+   `contriburl="file:///<root>"` 却去找 `<root>/PACKAGES`。
+   对远端仓库则相反 —— `repos=` 会再拼一次路径，导致索引 404。
+   最终：远端枚举用 `contriburl=`，本地根校验用 `repos=`。
+2. **残留索引会静默吞掉包**：`write_PACKAGES(addFiles=TRUE)` 会同时写
+   `PACKAGES.gz` / `PACKAGES.rds`；父目录里残留的旧索引会让
+   `available.packages()` 少报包数（实测报了 90，实际有 109）。
+   脚本会清理叶目录和根目录的旧索引，只保留纯文本 `PACKAGES`，
+   并在结束前断言"索引可见数 == zip 数"。
+
+---
+
 ## 9. 复现命令
 
 ```bash
@@ -368,4 +452,10 @@ Rscript 03_dependence/r-environment/run_functional_regression.R `
 
 # --- 5. 工具解析自检 ---
 Rscript -e "library(nanoamp); nanoamp_cli(c('doctor'))"
+
+# --- 6. 离线安装包（可选）---
+# 有网机器：生成 291 MB 固定版本安装包到 dist/
+Rscript 03_dependence/offline-bundle/fetch_offline_bundle.R
+# 无网机器：校验并安装 R + 全部 R 包 + nanoamp，并跑测试
+pwsh -File 03_dependence/offline-bundle/install_offline.ps1
 ```
