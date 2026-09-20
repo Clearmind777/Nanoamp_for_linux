@@ -26,6 +26,10 @@ install.packages(c(
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install("DECIPHER")
 
+# Required for aligner = "r" on Bioconductor >= 3.19, which moved
+# pairwiseAlignment() out of Biostrings
+BiocManager::install("pwalign")
+
 # Optional GUI
 install.packages(c("shiny", "DT"))
 ```
@@ -376,6 +380,7 @@ The package has been verified with `R CMD check` and currently passes with
 | Mode B is slow | Reduce `max_msa_seqs`, increase `threads`, or use `mode = "A"` |
 | Mode B cannot separate close haplotypes | This is expected below the sequencing error rate; use Mode A |
 | `DECIPHER` not installed | Mode B falls back to greedy clustering; install DECIPHER for better results |
+| `pairwiseAlignment` is not an exported object from Biostrings | Bioconductor >= 3.19 moved it to `pwalign`; install it with `BiocManager::install("pwalign")` |
 | All proportions are low in Mode C | Nanopore reads contain errors; use Mode A |
 
 ## License
