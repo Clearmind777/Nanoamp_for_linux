@@ -27,4 +27,4 @@ jobs:
       - name: Check package
         env:
           _R_CHECK_FORCE_SUGGESTS_: false
-        run: Rscript -e 'rcmdcheck::rcmdcheck("02_code/r", args = "--no-manual", error_on = "error")'
+        run: Rscript -e 'rcmdcheck::rcmdcheck("02_code", args = "--no-manual", error_on = "error")'

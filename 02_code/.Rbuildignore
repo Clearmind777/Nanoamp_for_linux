@@ -1,0 +1,12 @@
+^nanoamp\.Rproj$
+^\.Rproj\.user$
+^\.git$
+^\.gitignore$
+# This repository is not only an R package: 02_code also holds the CLI
+# launchers, the shared contracts and the repository-level helper scripts.
+# None of them belong in a built tarball.
+^cli$
+^shared$
+^scripts$
+^ARCHITECTURE\.md$
+^ARCHITECTURE-CN\.md$
