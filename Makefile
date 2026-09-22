@@ -1,20 +1,26 @@
 R_PKG := 02_code
 
-.PHONY: help install test check cli deps test-data functional-test clean-builds
+.PHONY: help install deps-r test check cli deps deps-all test-data functional-test clean-builds
 
 help:
 	@echo "nanoamp project targets:"
 	@echo "  make install      Install the R package (R CMD INSTALL $(R_PKG))"
+	@echo "  make deps-r       Install the R dependencies (pak first, then CRAN/Bioc)"
 	@echo "  make test         Run testthat tests"
 	@echo "  make check        Build and R CMD check into 05_builds/r"
 	@echo "  make cli          Run 'nanoamp doctor' from the repository CLI"
-	@echo "  make deps         Fetch bundled external tools where possible"
+	@echo "  make deps         Refresh the bundled minimap2 for the host platform"
 	@echo "  make test-data    Regenerate 01_data/manifest.tsv from 01_data/test_data"
 	@echo "  make functional-test Run all datasets x modes (needs R deps + minimap2)"
 	@echo "  make clean-builds Remove 05_builds/r contents"
 
 install:
 	R CMD INSTALL $(R_PKG)
+
+# minimap2 is already bundled for the four supported platforms; this only
+# installs the R packages, which are the part that cannot be pre-bundled.
+deps-r:
+	Rscript 02_code/scripts/install_r_deps.R
 
 # testthat loads the source package with pkgload, which (unlike devtools) is a
 # declared dependency and is what the repository CLI launcher uses as well.
@@ -32,6 +38,9 @@ cli:
 
 deps:
 	bash 03_dependence/fetch_dependencies.sh
+
+deps-all:
+	bash 03_dependence/fetch_dependencies.sh --all
 
 test-data:
 	Rscript 02_code/scripts/prepare_test_data.R

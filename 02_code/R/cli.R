@@ -151,10 +151,18 @@ cli_cmd_doctor <- function(args) {
   pkgs <- c("Biostrings", "IRanges", "Matrix", "Rsamtools", "ShortRead",
             "data.table", "optparse", "jsonlite", "readxl", "DECIPHER")
   for (p in pkgs) cat(sprintf("  %-12s %s\n", p, requireNamespace(p, quietly = TRUE)))
+  # minimap2 is bundled for every supported platform. samtools is deliberately
+  # not bundled because Rsamtools::asBam() covers SAM -> BAM, so a missing
+  # samtools is not a problem.
   for (tool in c("minimap2", "samtools")) {
     path <- nanoamp_tool_path(tool, required = FALSE)
     if (is.null(path)) {
-      cat(sprintf("  %-12s NOT FOUND\n", tool))
+      note <- if (identical(tool, "samtools")) {
+        "NOT FOUND (optional; Rsamtools is used by default)"
+      } else {
+        "NOT FOUND (expected at 03_dependence/<os>-<arch>/bin/, or use aligner = \"r\")"
+      }
+      cat(sprintf("  %-12s %s\n", tool, note))
     } else {
       cat(sprintf("  %-12s %s (%s)\n", tool, path, nanoamp_tool_version(tool, path)))
     }

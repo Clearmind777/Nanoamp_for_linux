@@ -45,3 +45,8 @@ NAMESPACE       text eol=lf
 *.tar           binary
 *.png           binary
 *.pdf           binary
+
+# The bundled external tools have no file extension, so pin them explicitly
+# instead of relying on auto-detection (which can be confused by the ELF/Mach-O
+# headers and would otherwise try to normalise line endings).
+03_dependence/*/bin/*   binary

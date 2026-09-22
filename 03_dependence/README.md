@@ -1,28 +1,69 @@
 # 03_dependence
 
-External tools bundled with nanoamp (Linux-only variant).
+External tools bundled with nanoamp. Every supported platform ships a working
+`minimap2`, so a fresh clone can run Modes A and B without installing conda or
+any other package manager.
 
 ## Layout
 
 ```text
 03_dependence/
-|-- README.md
-|-- README-CN.md
-|-- manifest.tsv
-|-- fetch_dependencies.sh
+|-- README.md / README-CN.md
+|-- manifest.tsv                  # version, source and sha256 of every bundled file
+|-- fetch_dependencies.sh         # refresh a binary (supports all four platforms)
 |-- licenses/
 |   `-- minimap2-LICENSE.txt
-|-- linux-x86_64/bin/
-|   |-- minimap2
-|   `-- samtools          # optional fallback
-|-- linux-arm64/README.md
-|-- macos-x86_64/README.md
-`-- macos-arm64/README.md
+|-- linux-x86_64/
+|   |-- README.md
+|   `-- bin/minimap2
+|-- linux-arm64/
+|   |-- README.md
+|   `-- bin/minimap2
+|-- macos-x86_64/
+|   |-- README.md
+|   `-- bin/minimap2
+`-- macos-arm64/
+    |-- README.md
+    `-- bin/minimap2
 ```
 
 All Windows-specific material (windows-x86_64, windows-arm64, the MSYS2 build
 scripts and the R environment scripts) lives in the sister repository
 `a_09_18_26_mapping_programs_dev_for_win`.
+
+## Platform support matrix
+
+| Platform | Binary in repo | File format | Runtime requirement |
+|---|---|---|---|
+| linux-x86_64 | `linux-x86_64/bin/minimap2` | ELF x86-64 | glibc >= 2.14, system zlib |
+| linux-arm64 | `linux-arm64/bin/minimap2` | ELF AArch64 | glibc >= 2.17, system zlib |
+| macos-x86_64 | `macos-x86_64/bin/minimap2` | Mach-O x86_64 | macOS system libraries only |
+| macos-arm64 | `macos-arm64/bin/minimap2` | Mach-O arm64 | macOS system libraries only |
+
+All four are minimap2 2.31-r1302. The total size of the bundled tools is about
+2.6 MB. Exact versions, download sources and sha256 values are in
+`manifest.tsv`; each platform directory has its own README with the verification
+command.
+
+## Why the binaries come from conda-forge
+
+Upstream minimap2 publishes an x86_64 Linux binary only, so Linux arm64 and both
+macOS architectures have no official build. conda-forge builds minimap2 for all
+four, and — this is the part that makes bundling possible — that build does not
+need conda at run time:
+
+- Linux: it links only `libm`, `libz`, `libpthread` and `libc`, with a glibc
+  baseline of 2.14 (x86_64) / 2.17 (arm64);
+- macOS: it links `/usr/lib/libSystem.B.dylib` plus the system zlib, which dyld
+  serves from the shared cache.
+
+Both facts were checked per platform with `file`, the ELF `DT_NEEDED` entries and
+`otool -L`, and the macOS arm64 file was additionally executed from `/tmp` with a
+stripped environment (`env -i`) to prove it runs outside conda.
+
+`samtools` is deliberately **not** bundled: `Rsamtools::asBam()` performs the
+SAM -> BAM conversion, so samtools is optional. If a machine already has samtools
+on `PATH`, `use_samtools = TRUE` will use it.
 
 ## How nanoamp finds external tools
 
@@ -35,53 +76,38 @@ Resolution order:
 `NANOAMP_DEPENDENCE_DIR` can point to a different `03_dependence` location
 (useful after installing the R package).
 
-`nanoamp doctor` prints the detected platform, the dependence directory, and
-the resolved path and version of each tool.
+`nanoamp doctor` prints the detected platform, the dependence directory, and the
+resolved path and version of each tool. With a bundled binary in place it looks
+like this, with no conda on `PATH`:
 
-## Platform support matrix
-
-| Platform | minimap2 | samtools | Notes |
-|---|---|---|---|
-| linux-x86_64 | bundled 2.31 | bundled 1.12 (optional) | Rsamtools is used for SAM -> BAM by default; samtools only with `use_samtools = TRUE` |
-| linux-arm64 | not bundled | not bundled | use conda or build from source; R-native backend available |
-| macos-x86_64 | not bundled | not bundled | use conda |
-| macos-arm64 | not bundled | not bundled | use conda |
-
-Windows has no rows here: `windows-x86_64` / `windows-arm64` are owned by the
-sister repository `a_09_18_26_mapping_programs_dev_for_win`, which bundles its
-own statically linked minimap2 binary.
-
-Official upstream facts:
-
-- minimap2 publishes a Linux x86_64 binary; there is no official binary for
-  Linux ARM64 or macOS, where conda or a source build is the usual route.
-- samtools publishes only source; conda-forge / bioconda provide it for Linux
-  and macOS, so `samtools` is a conda install away there.
+```text
+platform: macos-arm64
+dependence directory: /path/to/repo/03_dependence
+  minimap2     /path/to/repo/03_dependence/macos-arm64/bin/minimap2 (2.31-r1302)
+  samtools     NOT FOUND (optional; Rsamtools is used by default)
+```
 
 ## R-native fallback
 
-`run_haplotype_analysis(..., aligner = "r")` uses Biostrings pairwise
+`run_haplotype_analysis(..., aligner = "r")` uses Biostrings/pwalign pairwise
 alignment and needs no external binary. It is slower than minimap2 and is
-intended for small and medium amplicons, and for platforms where no minimap2
-binary exists (Linux ARM64, macOS).
-
-`aligner = "minimap2"` is the default for Linux x86_64.
-
-samtools is no longer required: `Rsamtools::asBam()` converts minimap2 SAM to
-BAM. Set `use_samtools = TRUE` only if you explicitly want the samtools path.
+intended for small and medium amplicons, and as a fallback on any platform whose
+bundled binary does not fit the host (for example a very old glibc).
 
 ## Fetching or updating tools
 
 ```bash
-bash 03_dependence/fetch_dependencies.sh
+bash 03_dependence/fetch_dependencies.sh                  # host platform
+bash 03_dependence/fetch_dependencies.sh --all             # all four platforms
+bash 03_dependence/fetch_dependencies.sh --platform macos-arm64
 ```
 
-The script downloads the official minimap2 Linux x86_64 binary and prints
-platform-specific instructions for Linux ARM64 and macOS.
+`mamba`, `micromamba` or `conda` must be available, but only to *fetch*: the
+script uses `CONDA_SUBDIR` to download foreign-platform packages, so one macOS or
+Linux host can refresh every platform without an emulator or Docker. The fetched
+`minimap2` is copied into `03_dependence/<platform>/bin/` and its sha256 is
+printed so `manifest.tsv` can be updated.
 
 ## Licenses
 
-- minimap2: MIT;
-- samtools: MIT/Expat.
-
-License text for the bundled minimap2 binary is in `licenses/`.
+- minimap2: MIT (license text in `licenses/minimap2-LICENSE.txt`).

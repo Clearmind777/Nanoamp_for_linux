@@ -4,18 +4,21 @@
 测序错误、重建单倍型，并输出数量最多、比例最高的序列。
 
 本仓库是 `nanoamp` 的命令行发行版，包含 `nanoamp` R 包、`nanoamp` 命令行程序，
-以及（针对 Linux x86_64）随附的 `minimap2` / `samtools` 二进制文件。
+以及**为四个平台全部预置好的 `minimap2`**（Linux 与 macOS，x86_64 与 arm64）。
 本仓库不包含图形界面。
 
 ## 安装
 
-所有外部依赖均使用 conda 安装。同一套命令适用于 Linux x86_64、Linux arm64 和
-macOS（Intel 与 Apple Silicon）。
+比对程序不需要安装：`03_dependence/<os>-<arch>/bin/minimap2` 已在仓库内，刚克隆
+下来即可使用，离线、不需要 conda 或任何包管理器。只有 R 包需要安装，按你的机器
+任选一种方式即可。
+
+### 方式 A —— conda（顺带装好 R）
 
 ```bash
-# 1. 创建环境（R、R 包、minimap2 和 samtools）
+# 1. 创建环境（R 与 R 包；minimap2 用仓库里预置的）
 conda create -n nanoamp -c conda-forge -c bioconda \
-  r-base minimap2 samtools \
+  r-base \
   r-data.table r-optparse r-jsonlite r-readxl \
   bioconductor-biostrings bioconductor-rsamtools bioconductor-shortread \
   bioconductor-iranges bioconductor-decipher
@@ -29,8 +32,35 @@ R CMD INSTALL 02_code
 sh 02_code/cli/nanoamp doctor
 ```
 
+### 方式 B —— 用你已有的 R
+
+不需要 conda。辅助脚本优先调用 `pak::pak()`：pak 会一次性解析 CRAN 与
+Bioconductor 的依赖图，并复用 CRAN / Bioconductor 为 macOS（arm64 与 x86_64）
+和 Windows 发布的预编译二进制；若 pak 缺失，则回退到 `install.packages()` +
+`BiocManager::install()`。
+
+```bash
+# 1. 安装 R 依赖（pak 优先，回退 install.packages / BiocManager）
+Rscript 02_code/scripts/install_r_deps.R
+
+# 2. 安装包并验证
+R CMD INSTALL 02_code
+sh 02_code/cli/nanoamp doctor
+```
+
 `doctor` 会打印：识别到的平台、依赖目录、可见的 R 包，以及 `minimap2` /
-`samtools` 的解析路径。
+`samtools` 的解析路径。预置二进制到位时，`minimap2` 解析到的是仓库内部的路径：
+
+```text
+platform: macos-arm64
+dependence directory: /path/to/repo/03_dependence
+  minimap2     /path/to/repo/03_dependence/macos-arm64/bin/minimap2 (2.31-r1302)
+  samtools     NOT FOUND (optional; Rsamtools is used by default)
+```
+
+`samtools` 故意不预置：`Rsamtools::asBam()` 就能完成 SAM→BAM。如果某台机器的
+`PATH` 里本来就有 `samtools`，`use_samtools = TRUE` 仍会用它。预置二进制是如何
+核实“只依赖操作系统库”的，见 `03_dependence/README-CN.md`。
 
 ## 快速开始
 
@@ -55,25 +85,26 @@ sh 02_code/cli/nanoamp call \
 00_materials/    委托、开发方案与历次工作报告
 01_data/         测试数据（test_data/ 原始交付 + manifest.tsv 名字映射）
 02_code/         R 包源码 + CLI 启动器 + 共享契约 + 辅助脚本
-03_dependence/   随附外部工具（Linux x86_64）与各平台说明
+03_dependence/   为四个平台预置的 minimap2 与各平台说明
 04_results/      运行结果（除 README 外不进 Git）
 05_builds/       R CMD build / check 产物
 ```
 
 ## 开发平台
 
-本仓库在不止一台机器上开发；代码本身不含平台相关逻辑，但随附的二进制文件和
-已验证过的环境是分平台的。
+本仓库在不止一台机器上开发；代码本身不含平台相关逻辑，而从报告 9 起每个支持的
+平台都有自己的预置 `minimap2`。
 
-| 平台 | 状态 | 说明 |
+| 平台 | 预置二进制 | 状态 |
 |---|---|---|
-| Linux x86_64 | 最初开发平台 | 自动使用 `03_dependence/linux-x86_64/bin/` 下随附的 `minimap2` 2.31 与 `samtools` 1.12；报告 1–7 的验证平台 |
-| macOS arm64（Apple Silicon） | 当前验证平台，见报告 8 | 随附的 Linux 二进制在此无法执行；请按上面第 1 步用 conda 安装 `minimap2`，或使用 `--aligner r` |
+| Linux x86_64 | `linux-x86_64/bin/minimap2`（glibc >= 2.14） | 最初开发平台，报告 1–7 的验证平台 |
+| Linux arm64 | `linux-arm64/bin/minimap2`（glibc >= 2.17） | 已预置；需在 Linux arm64 宿主上执行 |
+| macOS x86_64 | `macos-x86_64/bin/minimap2` | 已预置；在 Apple Silicon 上也可通过 Rosetta 2 运行 |
+| macOS arm64 | `macos-arm64/bin/minimap2` | 当前验证平台，见报告 8 |
 
 在 macOS arm64 上做一次完整本地验证：
 
 ```bash
-conda activate nanoamp
 make test             # testthat 单元测试
 make check            # R CMD build + R CMD check
 make cli              # sh 02_code/cli/nanoamp doctor
@@ -81,14 +112,14 @@ make functional-test  # 全部数据集 × 模式 A/B/C，输入按 01_data/mani
 ```
 
 最近一次 macOS arm64 验证结果（R 4.5.3、Biostrings 2.78.0、pwalign 1.6.0、
-DECIPHER 3.6.0、conda `minimap2` 2.31）：
+DECIPHER 3.6.0、**仓库预置的** `minimap2` 2.31，`PATH` 中没有 conda 提供的工具）：
 
 | 检查 | 结果 |
 |---|---|
 | `R CMD INSTALL 02_code` | 成功 |
 | `testthat` 单元测试 | 全部通过，无跳过 |
 | `R CMD check --no-manual` | **Status: OK** |
-| `nanoamp doctor` | 平台识别为 `macos-arm64`，R 包全 TRUE，minimap2/samtools 解析成功 |
+| `nanoamp doctor` | 平台识别为 `macos-arm64`，R 包全 TRUE，`minimap2` 解析到 `03_dependence/macos-arm64/bin/` |
 | `run_functional_tests.R`（3 数据集 × 32 样本 × 模式 A/B/C） | **168/168 全部 ok** |
 
 在可与 Linux x86_64 基线对比的指标上，跨平台结果一致：方案 A 与公司变异表
@@ -96,5 +127,5 @@ DECIPHER 3.6.0、conda `minimap2` 2.31）：
 原始精确匹配占比中位数为 **12.0%**（同样相同）。
 
 面向 Linux x86_64 的历史文档原样保留在 `00_materials/`（工作报告属于日志，不做
-改写；本轮报告 8 列出了发生变化的路径），Linux 相关的依赖说明保留在
+改写；报告 8、9 列出了发生变化的路径），各平台依赖说明保留在
 `02_code/inst/docs/INSTALL_DEPENDENCIES-CN.md`。英文版见 `README.md`。
