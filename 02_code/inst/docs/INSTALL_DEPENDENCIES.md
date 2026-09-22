@@ -91,9 +91,11 @@ Optional:
 
 ```r
 BiocManager::install("DECIPHER")          # Mode B clustering and consensus
-BiocManager::install("pwalign")           # pairwiseAlignment() provider, required
-                                          # by Mode B and by aligner = "r" on
-                                          # Bioconductor >= 3.19
+BiocManager::install("pwalign")           # pairwiseAlignment() provider for
+                                          # aligner = "r" and the Mode B
+                                          # annotation on Bioconductor >= 3.19;
+                                          # resolved lazily, so a minimap2-only
+                                          # run does not need it
 ```
 
 ### Automated install (pak first)

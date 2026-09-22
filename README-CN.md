@@ -62,6 +62,21 @@ dependence directory: /path/to/repo/03_dependence
 `PATH` 里本来就有 `samtools`，`use_samtools = TRUE` 仍会用它。预置二进制是如何
 核实“只依赖操作系统库”的，见 `03_dependence/README-CN.md`。
 
+## 两种不同的“比对”
+
+`minimap2` 和 `pwalign` 不是同一件事的两个可选方案：
+
+- **reads 比对**：`minimap2` 把每条 read 贴到目的序列上，并给出它携带的变异。
+  这是默认方式（`aligner = "minimap2"`），方案 A/B 走的就是这条路；
+- **成对比对**：Biostrings（Bioconductor >= 3.19 上是 `pwalign`）只做“一条序列
+  对一条序列”的比较。只有 `aligner = "r"`（内置二进制与宿主不匹配时的 R 内后端）
+  以及方案 B 对每个簇一致性序列的标注会用到它。
+
+成对比对的提供者是**惰性解析**的：第一次真正调用时才解析。只用 minimap2 的流程
+完全不会碰到它，所以即使没有安装 `pwalign`，包也能正常加载并跑完分析；
+`qc.tsv` 会记录实际使用的提供者，从未用到该后端时记为 `NA`。详见
+`02_code/README-CN.md`。
+
 ## 快速开始
 
 ```bash

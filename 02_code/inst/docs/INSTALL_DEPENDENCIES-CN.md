@@ -85,9 +85,10 @@ BiocManager::install(c("Biostrings", "Rsamtools", "ShortRead", "IRanges"))
 
 ```r
 BiocManager::install("DECIPHER")             # 方案 B 聚类与共识
-BiocManager::install("pwalign")              # pairwiseAlignment() 提供者；在
-                                             # Bioconductor >= 3.19 下方案 B 和
-                                             # aligner = "r" 都需要
+BiocManager::install("pwalign")              # pairwiseAlignment() 提供者，供
+                                             # aligner = "r" 和 Bioconductor
+                                             # >= 3.19 下的方案 B 标注使用；
+                                             # 惰性解析，只用 minimap2 不需安装
 ```
 
 ### 自动安装（pak 优先）

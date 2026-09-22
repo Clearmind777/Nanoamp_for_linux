@@ -23,6 +23,11 @@ install.packages(c(
 # 方案 B 推荐安装
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install("DECIPHER")
+
+# 只有 R 内后端（aligner = "r"）和方案 B 的一致性序列标注需要成对比对。
+# 在 Bioconductor >= 3.19 上 pairwiseAlignment() 已从 Biostrings 移到 pwalign。
+# 该提供者是惰性解析的，只用 minimap2 的流程完全不需要它。
+BiocManager::install("pwalign")
 ```
 
 ### 2. 安装 `nanoamp`
@@ -254,6 +259,15 @@ run_haplotype_analysis(..., aligner = "r")
 
 R 内后端使用 Biostrings 成对比对，不需要外部工具；速度较慢，适合中小扩增子。
 
+成对比对的提供者是**惰性解析**的：第一次真正用到时才解析并缓存结果。
+
+- `aligner = "minimap2"`（默认）完全不会碰到它，所以即使没装任何成对比对提供者，
+  包也能正常加载并跑完整个分析；
+- `aligner = "r"`，以及方案 B 对每个簇一致性序列的标注，会在第一次调用时解析；
+- 装了 `pwalign` 就优先用它，否则回退到 Biostrings；只有当两者都不提供
+  `pairwiseAlignment()` 时，才会在**调用处**报错。`qc.tsv` 会记录实际使用的
+  提供者（从未用到该后端时为 `NA`）。
+
 `samtools` 不是必需依赖：默认用 `Rsamtools::asBam()` 完成 SAM→BAM。
 只有显式设置 `use_samtools = TRUE` 才会调用 samtools。
 
@@ -324,6 +338,7 @@ Rscript 02_code/scripts/run_functional_tests.R \
 | 方案 B 太慢 | 降低 `max_msa_seqs`、增加 `threads`，或改用方案 A |
 | 方案 B 分不开相近单倍型 | 这是低于测序错误率时的固有限制，请用方案 A |
 | 没有安装 `DECIPHER` | 方案 B 会自动降级为贪心聚类；建议安装 DECIPHER |
+| 报错 `pairwiseAlignment` is not an exported object from Biostrings | 只有 `aligner = "r"` 和方案 B 标注需要成对比对。Bioconductor >= 3.19 已把它移到 `pwalign`，用 `BiocManager::install("pwalign")` 安装即可；默认的 minimap2 流程不受影响 |
 | 方案 C 比例很低 | 纳米孔 reads 有错误，请用方案 A |
 
 ## 许可证

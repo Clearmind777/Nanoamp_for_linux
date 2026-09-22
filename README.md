@@ -67,6 +67,23 @@ SAM -> BAM conversion. If a machine already has `samtools` on `PATH`,
 `use_samtools = TRUE` will use it. Details, including how the bundled binaries
 were verified to need nothing but OS libraries, are in `03_dependence/README.md`.
 
+## Two different "alignments"
+
+`minimap2` and `pwalign` are not two options for the same job:
+
+- **read mapping** — `minimap2` aligns every read to the target and reports the
+  variants it carries. This is the default (`aligner = "minimap2"`) and what
+  Modes A and B use;
+- **pairwise alignment** — Biostrings (or `pwalign` on Bioconductor >= 3.19)
+  compares one sequence against one sequence. Only `aligner = "r"` — the
+  R-native fallback for hosts the bundled binary does not fit — and the Mode B
+  annotation of cluster consensus sequences use it.
+
+The pairwise provider is resolved lazily, on first call. A minimap2-only run
+never touches it, so the package loads and completes an analysis even when
+`pwalign` is not installed; `qc.tsv` records which package supplied it, or `NA`
+when the backend was never used. See `02_code/README.md` for details.
+
 ## Quick start
 
 ```bash

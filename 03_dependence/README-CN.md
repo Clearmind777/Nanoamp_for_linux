@@ -85,6 +85,9 @@ dependence directory: /path/to/repo/03_dependence
 不依赖任何外部二进制。它比 minimap2 慢，适合中小扩增子，也适合内置二进制与宿主
 不匹配的情况（例如 glibc 过旧）。
 
+该提供者是惰性解析的，因此使用内置二进制、走默认 `aligner = "minimap2"` 时
+完全不需要 `pwalign`。
+
 ## 获取或更新工具
 
 ```bash

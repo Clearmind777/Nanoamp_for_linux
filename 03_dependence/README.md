@@ -94,6 +94,9 @@ alignment and needs no external binary. It is slower than minimap2 and is
 intended for small and medium amplicons, and as a fallback on any platform whose
 bundled binary does not fit the host (for example a very old glibc).
 
+That provider is resolved lazily, so installing a bundled binary and running the
+default `aligner = "minimap2"` never requires `pwalign`.
+
 ## Fetching or updating tools
 
 ```bash

@@ -29,16 +29,27 @@ utils::globalVariables(c(
 # is not sufficient, and it silently selected the defunct Biostrings version on
 # Bioconductor >= 3.19. Prefer pwalign whenever it is installed; that is correct
 # for generations 2 and 3, and harmless for generation 1.
+#
+# The provider is resolved lazily, on first call, and cached. Only
+# aligner = "r" and the Mode B consensus annotation use it, so a package
+# without a usable provider must still load and must still run the default
+# minimap2 workflow; the error belongs at the call site that actually needs
+# pairwise alignment, not at library().
 # ---------------------------------------------------------------------------
 .pa_env <- new.env(parent = emptyenv())
 .pa_optional_package <- "pwalign"
 .pa_fns <- c("pairwiseAlignment", "pattern", "subject", "aligned", "score")
 
 .pa_exported <- function(ns, fn) {
-  fn %in% getNamespaceExports(ns) && exists(fn, envir = ns, inherits = FALSE)
+  # A symbol can be exported yet not defined in the namespace when it is
+  # re-exported from a dependency (Biostrings 2.66 re-exports the IRanges /
+  # S4Vectors generics `subject()` and `score()`). Asking for the exported
+  # value directly accepts those re-exports and still rejects symbols that are
+  # not available from the namespace at all.
+  is.function(tryCatch(getExportedValue(ns, fn), error = function(e) NULL))
 }
 
-.pa_provider <- function() {
+.pa_resolve <- function() {
   if (requireNamespace(.pa_optional_package, quietly = TRUE)) {
     return(asNamespace(.pa_optional_package))
   }
@@ -54,18 +65,23 @@ utils::globalVariables(c(
   )
 }
 
-.onLoad <- function(libname, pkgname) {
-  prov <- .pa_provider()
-  for (fn in .pa_fns) {
-    assign(fn, get(fn, envir = prov), envir = .pa_env)
+.pa_provider <- function() {
+  if (is.null(.pa_env$namespace)) {
+    prov <- .pa_resolve()
+    .pa_env$namespace <- prov
+    .pa_env$provider <- environmentName(prov)
   }
-  assign("provider", environmentName(prov), envir = .pa_env)
-  invisible()
+  .pa_env$namespace
 }
 
-pa_pairwise_alignment <- function(...) .pa_env$pairwiseAlignment(...)
-pa_pattern <- function(x) .pa_env$pattern(x)
-pa_subject <- function(x) .pa_env$subject(x)
-pa_aligned <- function(x) .pa_env$aligned(x)
-pa_score <- function(x) .pa_env$score(x)
-pa_provider_name <- function() .pa_env$provider
+.pa_fn <- function(name) getExportedValue(.pa_provider(), name)
+
+pa_pairwise_alignment <- function(...) .pa_fn("pairwiseAlignment")(...)
+pa_pattern <- function(x) .pa_fn("pattern")(x)
+pa_subject <- function(x) .pa_fn("subject")(x)
+pa_aligned <- function(x) .pa_fn("aligned")(x)
+pa_score <- function(x) .pa_fn("score")(x)
+
+# NA until pairwise alignment is actually used, so that QC output does not
+# force a resolution (and cannot fail) on minimap2-only runs.
+pa_provider_name <- function() .pa_env$provider %||% NA_character_

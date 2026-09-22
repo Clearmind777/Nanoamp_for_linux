@@ -26,8 +26,10 @@ install.packages(c(
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install("DECIPHER")
 
-# Required for aligner = "r" on Bioconductor >= 3.19, which moved
-# pairwiseAlignment() out of Biostrings
+# Only needed by the R-native backend (aligner = "r") and by the Mode B
+# consensus annotation, which use pairwise alignment. On Bioconductor >= 3.19
+# pairwiseAlignment() moved from Biostrings to pwalign. The provider is
+# resolved lazily, so a minimap2-only workflow never needs it.
 BiocManager::install("pwalign")
 ```
 
@@ -273,6 +275,17 @@ run_haplotype_analysis(..., aligner = "r")
 The R-native backend uses Biostrings pairwise alignment and requires no
 external tool. It is slower and is intended for small and medium amplicons.
 
+That pairwise alignment provider is resolved lazily, on first call, and the
+result is cached:
+
+- `aligner = "minimap2"` (the default) never touches it, so the package loads
+  and runs a full analysis even when no pairwise provider is installed;
+- `aligner = "r"`, and the Mode B annotation of cluster consensus sequences,
+  resolve it on first use;
+- `pwalign` is preferred when installed, otherwise Biostrings is used; only if
+  neither provides `pairwiseAlignment()` does the call itself fail. `qc.tsv`
+  records which provider supplied it (`NA` when the backend was never used).
+
 `samtools` is optional: SAM -> BAM conversion uses `Rsamtools::asBam()` by
 default. Set `use_samtools = TRUE` only if you explicitly want the samtools
 path.
@@ -348,7 +361,7 @@ The package has been verified with `R CMD check` and currently passes with
 | Mode B is slow | Reduce `max_msa_seqs`, increase `threads`, or use `mode = "A"` |
 | Mode B cannot separate close haplotypes | This is expected below the sequencing error rate; use Mode A |
 | `DECIPHER` not installed | Mode B falls back to greedy clustering; install DECIPHER for better results |
-| `pairwiseAlignment` is not an exported object from Biostrings | Bioconductor >= 3.19 moved it to `pwalign`; install it with `BiocManager::install("pwalign")` |
+| `pairwiseAlignment` is not an exported object from Biostrings | Only `aligner = "r"` and the Mode B annotation need pairwise alignment. Bioconductor >= 3.19 moved it to `pwalign`; install it with `BiocManager::install("pwalign")`. The default minimap2 workflow is unaffected |
 | All proportions are low in Mode C | Nanopore reads contain errors; use Mode A |
 
 ## License
