@@ -11,7 +11,8 @@
 #   bash 03_dependence/fetch_dependencies.sh --all         # refresh all four
 #   bash 03_dependence/fetch_dependencies.sh --platform macos-arm64
 #
-# Why the binaries come from conda-forge rather than the upstream release:
+# Why the binaries come from the conda minimap2 package rather than the upstream
+# release:
 #   * upstream publishes an x86_64 Linux build only, so Linux arm64 and both
 #     macOS architectures have no official binary;
 #   * the conda-forge build needs no conda *at run time*: minimap2 links only
@@ -32,7 +33,11 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 CONDA_CHANNELS="-c conda-forge -c bioconda"
-MINIMAP2_VERSION="2.31-r1302"
+# conda package version to pin. The resulting binary reports `--version` as
+# 2.31-r1302. Without this pin conda resolves whatever build is newest at fetch
+# time, which is how linux-x86_64 once ended up on a 2.28 build while the other
+# three platforms already had 2.31.
+MINIMAP2_VERSION="2.31"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -104,7 +109,7 @@ fetch_minimap2() {
   # --no-deps: minimap2 needs no conda-provided shared library, and skipping
   # dependencies keeps the download small.
   CONDA_SUBDIR="$subdir" "$conda" create -y -p "$tmp/env" $CONDA_CHANNELS \
-    --no-deps minimap2 >"$tmp/log" 2>&1 || {
+    --no-deps "minimap2=${MINIMAP2_VERSION}" >"$tmp/log" 2>&1 || {
       echo "conda fetch failed for ${platform}; log tail:" >&2
       tail -20 "$tmp/log" >&2
       return 1
