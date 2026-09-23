@@ -65,11 +65,11 @@ bash 03_dependence/fetch_dependencies.sh --all         # 四个平台全刷
 
 ## 3. R 包
 
-必需：
+必需（九个包；**故意不含 `ShortRead`**，原因见下）：
 
 ```r
 install.packages(c(
-  "Biostrings", "Rsamtools", "ShortRead", "IRanges", "Matrix",
+  "Biostrings", "Rsamtools", "IRanges", "Matrix",
   "data.table", "optparse", "jsonlite", "readxl"
 ))
 ```
@@ -78,7 +78,7 @@ install.packages(c(
 
 ```r
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-BiocManager::install(c("Biostrings", "Rsamtools", "ShortRead", "IRanges"))
+BiocManager::install(c("Biostrings", "Rsamtools", "IRanges"))
 ```
 
 可选：
@@ -87,9 +87,16 @@ BiocManager::install(c("Biostrings", "Rsamtools", "ShortRead", "IRanges"))
 BiocManager::install("DECIPHER")             # 方案 B 聚类与共识
 BiocManager::install("pwalign")              # pairwiseAlignment() 提供者，供
                                              # aligner = "r" 和 Bioconductor
-                                             # >= 3.19 下的方案 B 标注使用；
-                                             # 惰性解析，只用 minimap2 不需安装
+                                             # >= 3.19 下的方案 B 标注使用
 ```
+
+只有 `aligner = "r"` 与方案 B 的共识标注需要成对比对提供者，而且它是惰性解析的，
+因此用预置 minimap2 跑方案 A / C 时，**既不需要 `pwalign`，也不需要可用的
+Biostrings 提供者**。
+
+`ShortRead` 以前是读 FASTQ 的硬依赖，但它在 `Imports` 里**无条件**依赖 `pwalign`，
+会把该提供者强加给每一个安装；因此 nanoamp 改为用 `R/io.R` 里的小型 base R 解析器
+读取 FASTQ。`ShortRead` 现在既不被使用，也不再是依赖。
 
 ### 自动安装（pak 优先）
 
@@ -110,7 +117,7 @@ Rscript 02_code/scripts/install_r_deps.R --only-required
 
 ```r
 install.packages(c("data.table", "jsonlite", "optparse", "readxl"))
-BiocManager::install(c("Biostrings", "IRanges", "Rsamtools", "ShortRead",
+BiocManager::install(c("Biostrings", "IRanges", "Rsamtools",
                        "DECIPHER", "pwalign"))
 ```
 

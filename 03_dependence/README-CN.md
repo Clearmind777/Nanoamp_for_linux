@@ -101,6 +101,12 @@ bash 03_dependence/fetch_dependencies.sh --platform macos-arm64
 模拟器或 Docker。下载到的 `minimap2` 会被拷进 `03_dependence/<平台>/bin/`，并打印
 sha256，便于同步更新 `manifest.tsv`。
 
+版本是**固定**的（`minimap2=2.31`）：不固定时 conda 会解析成当时最新的构建，这正是
+`linux-x86_64` 一度变成 2.28 构建、而另外三个平台已是 2.31 的原因。此外 `linux-64`
+包声明了虚拟包 `__glibc`，而 conda 只在 Linux 宿主上提供它，因此脚本设置
+`CONDA_OVERRIDE_GLIBC=2.17`，使从 macOS 交叉下载依然可行；2.17 与预置 Linux 二进制
+实际需要的运行时下限一致。
+
 ## 许可证
 
 - minimap2：MIT（许可证文本在 `licenses/minimap2-LICENSE.txt`）。

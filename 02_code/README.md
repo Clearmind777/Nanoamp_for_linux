@@ -18,7 +18,7 @@ The package is designed for questions such as:
 
 ```r
 install.packages(c(
-  "Biostrings", "Rsamtools", "ShortRead", "IRanges", "Matrix",
+  "Biostrings", "Rsamtools", "IRanges", "Matrix",
   "data.table", "optparse", "jsonlite", "readxl"
 ))
 
@@ -29,9 +29,14 @@ BiocManager::install("DECIPHER")
 # Only needed by the R-native backend (aligner = "r") and by the Mode B
 # consensus annotation, which use pairwise alignment. On Bioconductor >= 3.19
 # pairwiseAlignment() moved from Biostrings to pwalign. The provider is
-# resolved lazily, so a minimap2-only workflow never needs it.
+# resolved lazily, so Modes A and C with the bundled minimap2 never need it.
 BiocManager::install("pwalign")
 ```
+
+`ShortRead` is intentionally not in that list. It used to provide the FASTQ
+reader, but it imports `pwalign` unconditionally, which forced a
+pairwise-alignment provider onto every installation. nanoamp now reads FASTQ
+with the small base-R parser in `R/io.R` instead.
 
 ### 2. Install `nanoamp`
 
@@ -279,7 +284,9 @@ That pairwise alignment provider is resolved lazily, on first call, and the
 result is cached:
 
 - `aligner = "minimap2"` (the default) never touches it, so the package loads
-  and runs a full analysis even when no pairwise provider is installed;
+  and runs a full analysis even when no pairwise provider is installed — this is
+  exactly why the `ShortRead` FASTQ reader was replaced with the parser in
+  `R/io.R`, since `ShortRead` would otherwise pull `pwalign` in unconditionally;
 - `aligner = "r"`, and the Mode B annotation of cluster consensus sequences,
   resolve it on first use;
 - `pwalign` is preferred when installed, otherwise Biostrings is used; only if

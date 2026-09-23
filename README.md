@@ -79,10 +79,13 @@ were verified to need nothing but OS libraries, are in `03_dependence/README.md`
   R-native fallback for hosts the bundled binary does not fit — and the Mode B
   annotation of cluster consensus sequences use it.
 
-The pairwise provider is resolved lazily, on first call. A minimap2-only run
-never touches it, so the package loads and completes an analysis even when
-`pwalign` is not installed; `qc.tsv` records which package supplied it, or `NA`
-when the backend was never used. See `02_code/README.md` for details.
+The pairwise provider is resolved lazily, on first call, and FASTQ is read by the
+base-R parser in `R/io.R` rather than by `ShortRead` (which imports `pwalign`
+unconditionally). A Mode A or Mode C run with the bundled minimap2 therefore
+loads and completes even when no pairwise provider is installed; `qc.tsv` records
+which package supplied it, or `NA` when the backend was never used. Only
+`aligner = "r"` and Mode B's cluster annotation need it, and they fail with an
+explanatory message if it is missing. See `02_code/README.md` for details.
 
 ## Quick start
 

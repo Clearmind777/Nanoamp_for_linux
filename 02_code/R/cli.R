@@ -148,12 +148,12 @@ cli_cmd_doctor <- function(args) {
   cat("platform:", nanoamp_platform(), "\n")
   dep <- nanoamp_dependence_dir()
   cat("dependence directory:", if (is.null(dep)) "NOT FOUND" else dep, "\n")
-  pkgs <- c("Biostrings", "IRanges", "Matrix", "Rsamtools", "ShortRead",
-            "data.table", "optparse", "jsonlite", "readxl", "DECIPHER")
+  # Hard dependencies first, then the optional ones. ShortRead is no longer used:
+  # FASTQ is read with the base-R parser in R/io.R, which is what removed the
+  # pwalign requirement from the default workflow.
+  pkgs <- c("Biostrings", "IRanges", "Matrix", "Rsamtools",
+            "data.table", "optparse", "jsonlite", "readxl", "DECIPHER", "pwalign")
   for (p in pkgs) cat(sprintf("  %-12s %s\n", p, requireNamespace(p, quietly = TRUE)))
-  # minimap2 is bundled for every supported platform. samtools is deliberately
-  # not bundled because Rsamtools::asBam() covers SAM -> BAM, so a missing
-  # samtools is not a problem.
   for (tool in c("minimap2", "samtools")) {
     path <- nanoamp_tool_path(tool, required = FALSE)
     if (is.null(path)) {

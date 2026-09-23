@@ -111,6 +111,14 @@ Linux host can refresh every platform without an emulator or Docker. The fetched
 `minimap2` is copied into `03_dependence/<platform>/bin/` and its sha256 is
 printed so `manifest.tsv` can be updated.
 
+The version is pinned (`minimap2=2.31`) because an unpinned fetch resolves
+whatever build is newest at the time — which is how `linux-x86_64` once ended up
+on a 2.28 build while the other three platforms had 2.31. The `linux-64` package
+also declares a dependency on the virtual package `__glibc`, which conda only
+provides on a Linux host, so the script sets `CONDA_OVERRIDE_GLIBC=2.17` to keep
+cross-fetching from macOS working. 2.17 matches the runtime floor the bundled
+Linux binaries really need.
+
 ## Licenses
 
 - minimap2: MIT (license text in `licenses/minimap2-LICENSE.txt`).

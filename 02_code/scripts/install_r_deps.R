@@ -23,8 +23,10 @@ only_required <- "--only-required" %in% args
 
 # Required to run nanoamp; optional adds Mode B clustering/consensus quality and
 # the pwalign provider used by pairwiseAlignment() on Bioconductor >= 3.19.
+# ShortRead is deliberately not listed: FASTQ is read by the base-R parser in
+# R/io.R, and ShortRead would drag pwalign into every installation.
 required <- c(
-  "Biostrings", "IRanges", "Matrix", "Rsamtools", "ShortRead",
+  "Biostrings", "IRanges", "Matrix", "Rsamtools",
   "data.table", "jsonlite", "optparse", "readxl"
 )
 optional <- c("DECIPHER", "pwalign")
@@ -103,7 +105,7 @@ if (use_pak) {
 # ---------------------------------------------------------------------------
 repos <- c(CRAN = "https://cloud.r-project.org", BioCsoft = "https://bioconductor.org/packages/release/bioc")
 
-bioc_pkgs <- c("Biostrings", "IRanges", "Rsamtools", "ShortRead", "DECIPHER", "pwalign")
+bioc_pkgs <- c("Biostrings", "IRanges", "Rsamtools", "DECIPHER", "pwalign")
 cran_pkgs <- setdiff(need, bioc_pkgs)
 
 if (length(cran_pkgs) > 0) {

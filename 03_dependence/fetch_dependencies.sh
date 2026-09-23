@@ -39,6 +39,17 @@ CONDA_CHANNELS="-c conda-forge -c bioconda"
 # three platforms already had 2.31.
 MINIMAP2_VERSION="2.31"
 
+# The linux-64 build declares a dependency on the virtual package __glibc, which
+# conda only provides on a Linux host. Cross-fetching linux-64 from macOS
+# therefore fails with
+#   minimap2 =2.31 is not installable because it requires __glibc >=2.17,<3.0.a0
+# CONDA_OVERRIDE_GLIBC supplies that virtual package. 2.17 matches the runtime
+# floor the bundled linux binaries actually need (verified with the ELF dynamic
+# section), so the override does not overstate what the host must provide, and it
+# resolves to exactly the binary recorded in manifest.tsv. Set it to "0" to force
+# a plain host-virtual-package lookup instead.
+CONDA_OVERRIDE_GLIBC_VALUE="${CONDA_OVERRIDE_GLIBC:-2.17}"
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -108,7 +119,11 @@ fetch_minimap2() {
 
   # --no-deps: minimap2 needs no conda-provided shared library, and skipping
   # dependencies keeps the download small.
-  CONDA_SUBDIR="$subdir" "$conda" create -y -p "$tmp/env" $CONDA_CHANNELS \
+  # CONDA_OVERRIDE_GLIBC is only needed when the target is a Linux platform and
+  # the host is not Linux (conda cannot see __glibc otherwise); supplying it
+  # unconditionally is harmless for the macOS subdirs.
+  CONDA_SUBDIR="$subdir" CONDA_OVERRIDE_GLIBC="$CONDA_OVERRIDE_GLIBC_VALUE" \
+    "$conda" create -y -p "$tmp/env" $CONDA_CHANNELS \
     --no-deps "minimap2=${MINIMAP2_VERSION}" >"$tmp/log" 2>&1 || {
       echo "conda fetch failed for ${platform}; log tail:" >&2
       tail -20 "$tmp/log" >&2

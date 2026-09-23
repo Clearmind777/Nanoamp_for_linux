@@ -15,7 +15,8 @@ Planning documents and work reports for the nanoamp project.
     |-- work_report.6.md       # GitHub remote, Windows minimap2 build, local R regression
     |-- work_report.7.md       # Linux repo reduced to the CLI-only distribution
     |-- work_report.8.md       # ln_test_data removed, 02_code flattened, macOS arm64 verified
-    `-- work_report.9.md       # minimap2 bundled for 4 platforms, samtools dropped, pak-first R deps
+    |-- work_report.9.md       # minimap2 bundled for 4 platforms, samtools dropped, pak-first R deps
+    `-- work_report.10.md      # linux cross-fetch fixed, ShortRead replaced by a base-R FASTQ reader
 ```
 
 Start with `programs_dev_info.md` for the original request and
@@ -33,4 +34,6 @@ on macOS arm64; it lists the paths that changed, so reports 1-7 may still name
 paths (`02_code/r/...`, `01_data/ln_test_data/...`) that no longer exist. Report 9
 records the switch from a single Linux x86_64 bundled binary to a bundled
 `minimap2` for all four supported platforms, and the removal of the bundled
-`samtools`.
+`samtools`. Report 10 fixes cross-fetching linux-64 from macOS and replaces the
+`ShortRead` FASTQ reader with a base-R parser, which is what finally makes the
+default workflow independent of `pwalign`.

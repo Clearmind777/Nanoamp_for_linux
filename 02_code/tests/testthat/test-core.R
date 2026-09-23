@@ -126,3 +126,63 @@ test_that("test data manifest 的每个逻辑名都指向存在的真实文件",
   expect_true(all(startsWith(m$path, "test_data/")))
   expect_true(all(file.exists(file.path(data_root, m$path))))
 })
+
+# ---------------------------------------------------------------------------
+# FASTQ reader (base R since ShortRead was dropped)
+# ---------------------------------------------------------------------------
+
+test_that("FASTQ 解析器返回正确的列、id 与逐 read 质量长度", {
+  td <- tempfile("nanoamp_fastq_"); dir.create(td)
+  seqs <- c("ACGTACGT", "ACGT", "ACGTA")
+  fq <- file.path(td, "reads.fastq")
+  # qualities with visible length differences, all printable Phred+33
+  lines <- as.vector(rbind(
+    sprintf("@read%d extra description", seq_along(seqs)),
+    seqs, "+",
+    vapply(nchar(seqs), function(n) paste(rep("I", n), collapse = ""), character(1))
+  ))
+  writeLines(lines, fq)
+
+  d <- read_fastq(fq)
+  expect_equal(names(d), c("read_id", "sequence", "quality"))
+  expect_equal(nrow(d), 3L)
+  # the '@' is not part of the id, and the description after the first space is kept
+  expect_equal(d$read_id[1], "read1 extra description")
+  expect_equal(d$sequence, seqs)
+  # quality must match the read it belongs to, not be padded to the longest read
+  expect_equal(nchar(d$quality), nchar(d$sequence))
+  expect_equal(count_fastq_reads(fq), 3L)
+})
+
+test_that("FASTQ 解析器能读 gzip，并拒绝畸形输入", {
+  td <- tempfile("nanoamp_fastq_gz_"); dir.create(td)
+  seqs <- c("ACGTACGT", "ACGT")
+  plain <- file.path(td, "reads.fastq")
+  write_test_fastq(seqs, plain)
+  gz <- file.path(td, "reads.fastq.gz")
+  con_in <- file(plain, "rt"); con_out <- gzfile(gz, "wt")
+  writeLines(readLines(con_in), con_out); close(con_in); close(con_out)
+
+  expect_equal(read_fastq(plain), read_fastq(gz))
+  expect_equal(count_fastq_reads(gz), 2L)
+
+  # a file whose line count is not a multiple of 4 must fail loudly
+  broken <- file.path(td, "broken.fastq")
+  writeLines(c("@r1", "ACGT", "+"), broken)
+  expect_error(read_fastq(broken), "Malformed FASTQ")
+  expect_error(count_fastq_reads(broken), "Malformed FASTQ")
+
+  # a file that is not FASTQ at all must not be silently mis-parsed
+  notfastq <- file.path(td, "not.fastq")
+  writeLines(c("ACGT", "ACGT", "ACGT", "ACGT"), notfastq)
+  expect_error(read_fastq(notfastq), "Malformed FASTQ")
+})
+
+test_that("空 FASTQ 返回空表而不是报错", {
+  td <- tempfile("nanoamp_fastq_empty_"); dir.create(td)
+  fq <- file.path(td, "empty.fastq"); file.create(fq)
+  d <- read_fastq(fq)
+  expect_equal(nrow(d), 0L)
+  expect_equal(names(d), c("read_id", "sequence", "quality"))
+  expect_equal(count_fastq_reads(fq), 0L)
+})

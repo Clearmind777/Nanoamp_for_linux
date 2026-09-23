@@ -71,11 +71,11 @@ bundled lookup fails.
 
 ## 3. R packages
 
-Required:
+Required (nine packages; `ShortRead` is deliberately absent, see below):
 
 ```r
 install.packages(c(
-  "Biostrings", "Rsamtools", "ShortRead", "IRanges", "Matrix",
+  "Biostrings", "Rsamtools", "IRanges", "Matrix",
   "data.table", "optparse", "jsonlite", "readxl"
 ))
 ```
@@ -84,7 +84,7 @@ If the Bioconductor packages are not available from CRAN:
 
 ```r
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-BiocManager::install(c("Biostrings", "Rsamtools", "ShortRead", "IRanges"))
+BiocManager::install(c("Biostrings", "Rsamtools", "IRanges"))
 ```
 
 Optional:
@@ -93,10 +93,17 @@ Optional:
 BiocManager::install("DECIPHER")          # Mode B clustering and consensus
 BiocManager::install("pwalign")           # pairwiseAlignment() provider for
                                           # aligner = "r" and the Mode B
-                                          # annotation on Bioconductor >= 3.19;
-                                          # resolved lazily, so a minimap2-only
-                                          # run does not need it
+                                          # annotation on Bioconductor >= 3.19
 ```
+
+Only `aligner = "r"` and the Mode B consensus annotation need a pairwise-alignment
+provider, and it is resolved lazily, so a Mode A or Mode C run with the bundled
+minimap2 works with neither `pwalign` nor a usable `Biostrings` provider.
+
+`ShortRead` used to be a hard dependency for reading FASTQ. It imports `pwalign`
+unconditionally, which would have forced that provider onto every installation, so
+nanoamp now reads FASTQ with the small base-R parser in `R/io.R`. `ShortRead` is
+no longer used and no longer required.
 
 ### Automated install (pak first)
 
@@ -120,7 +127,7 @@ fallback path does:
 
 ```r
 install.packages(c("data.table", "jsonlite", "optparse", "readxl"))
-BiocManager::install(c("Biostrings", "IRanges", "Rsamtools", "ShortRead",
+BiocManager::install(c("Biostrings", "IRanges", "Rsamtools",
                        "DECIPHER", "pwalign"))
 ```
 

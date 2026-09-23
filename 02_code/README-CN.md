@@ -16,7 +16,7 @@
 
 ```r
 install.packages(c(
-  "Biostrings", "Rsamtools", "ShortRead", "IRanges", "Matrix",
+  "Biostrings", "Rsamtools", "IRanges", "Matrix",
   "data.table", "optparse", "jsonlite", "readxl"
 ))
 
@@ -26,9 +26,13 @@ BiocManager::install("DECIPHER")
 
 # 只有 R 内后端（aligner = "r"）和方案 B 的一致性序列标注需要成对比对。
 # 在 Bioconductor >= 3.19 上 pairwiseAlignment() 已从 Biostrings 移到 pwalign。
-# 该提供者是惰性解析的，只用 minimap2 的流程完全不需要它。
+# 该提供者是惰性解析的，用预置 minimap2 跑方案 A / C 完全不需要它。
 BiocManager::install("pwalign")
 ```
+
+上面**故意不含 `ShortRead`**。它以前负责读 FASTQ，但它在 `Imports` 里无条件依赖
+`pwalign`，等于把这个提供者强加给每一个安装；nanoamp 现在改用 `R/io.R` 里的小型
+base R 解析器读取 FASTQ。
 
 ### 2. 安装 `nanoamp`
 
@@ -262,7 +266,8 @@ R 内后端使用 Biostrings 成对比对，不需要外部工具；速度较慢
 成对比对的提供者是**惰性解析**的：第一次真正用到时才解析并缓存结果。
 
 - `aligner = "minimap2"`（默认）完全不会碰到它，所以即使没装任何成对比对提供者，
-  包也能正常加载并跑完整个分析；
+  包也能正常加载并跑完整个分析——这正是把 `ShortRead` 的 FASTQ 读取换成
+  `R/io.R` 里自研解析器的原因：`ShortRead` 会无条件把 `pwalign` 拖进来；
 - `aligner = "r"`，以及方案 B 对每个簇一致性序列的标注，会在第一次调用时解析；
 - 装了 `pwalign` 就优先用它，否则回退到 Biostrings；只有当两者都不提供
   `pairwiseAlignment()` 时，才会在**调用处**报错。`qc.tsv` 会记录实际使用的
