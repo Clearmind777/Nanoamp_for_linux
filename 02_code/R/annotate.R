@@ -305,12 +305,12 @@ annotation_transcript_structure <- function(transcript_id) {
 #'
 #' A mismatch means the CDS/phase/strand handling is wrong, which would corrupt
 #' every downstream consequence, so the caller must abort rather than warn.
-annotation_verify_reference_protein <- function(structure, genetic_code) {
+annotation_verify_reference_protein <- function(structure, genetic_code, retries = 5L) {
   if (!isTRUE(structure$ok)) {
     return(list(ok = FALSE, problem = structure$problem))
   }
   official <- tryCatch(
-    annotation_protein_sequence(structure$transcript_id),
+    annotation_protein_sequence(structure$transcript_id, retries = retries),
     error = function(e) NA_character_
   )
   if (is.na(official)) {
@@ -378,40 +378,42 @@ annotation_verify_reference_protein <- function(structure, genetic_code) {
 
 #' Map amplicon-frame variants onto the genomic frame
 #'
-#' Works on the reference frame: an insertion anchored between reference
-#' positions p and p+1 maps to genomic p + offset, a deletion or substitution
-#' starting at p maps to genomic p + offset. Alleles are reverse-complemented
-#' when the amplicon was located on the minus strand, so that the resulting
-#' operations can always be applied to forward-strand sequence.
+#' Works on the reference frame. The amplicon reference is in the reads' own
+#' orientation, so on a minus-strand hit its position 1 corresponds to the
+#' highest genomic coordinate:
+#'
+#'   * substitutions and deletions: genome = end - pos + 1
+#'   * insertions are anchored between pos-1 and pos, so their genomic anchor is
+#'     the base *after* the insertion point: genome = end - pos + 2
+#'
+#' Alleles are reverse-complemented so that every operation can be applied to
+#' forward-strand sequence. Getting this wrong shifts every coordinate by one or
+#' flips an allele, which is why the mirror tests in test-annotate.R compare a
+#' minus-strand frame against the equivalent plus-strand one.
 annotation_variants_to_genomic <- function(ops, genomic) {
   if (is.null(ops) || nrow(ops) == 0) return(ops)
-  if (identical(genomic$strand, "-")) {
-    stop(paste0(
-      "Annotation: the amplicon was located on the minus strand and this build\n",
-      "does not yet map variant coordinates for minus-strand amplicons.\n",
-      "Refusing to guess. Use route \"cds\" with cds.strand = \"-\" instead, which\n",
-      "handles the reverse complement explicitly."
-    ), call. = FALSE)
-  }
   ops <- data.table::as.data.table(ops)
-  offset <- genomic$start - 1L
   minus <- identical(genomic$strand, "-")
   out <- data.table::copy(ops)
-  out[, genome_pos := as.integer(pos) + offset]
-  if (minus) {
-    # minus-strand frame: positions are mirrored inside the matched interval
-    span <- genomic$end - genomic$start + 1L
-    out[, genome_pos := genomic$end - as.integer(pos)]
-    out[, genome_pos := pmax(genomic$start - 1L, genome_pos)]
-    out[, `:=`(
-      ref = as.character(Biostrings::reverseComplement(Biostrings::DNAStringSet(
-        ifelse(nzchar(ref), ref, "N")))),
-      alt = as.character(Biostrings::reverseComplement(Biostrings::DNAStringSet(
-        ifelse(nzchar(alt), alt, "N"))))
-    )]
-    out[nchar(ops$ref) == 0L, ref := ""]
-    out[nchar(ops$alt) == 0L, alt := ""]
+  if (!minus) {
+    out[, genome_pos := as.integer(pos) + genomic$start - 1L]
+    return(out[])
   }
+  is_ins <- as.character(out$type) == "ins"
+  out[, genome_pos := genomic$end - as.integer(pos) + 1L]
+  out[is_ins, genome_pos := genomic$end - as.integer(pos) + 2L]
+  # alleles are given on the plus strand of the amplicon; the genomic frame is
+  # the opposite strand
+  rc <- function(x) {
+    x <- as.character(x)
+    out <- vapply(x, function(v) {
+      if (is.na(v) || !nzchar(v)) return("")
+      as.character(Biostrings::reverseComplement(Biostrings::DNAStringSet(v)))
+    }, character(1))
+    out[is.na(x)] <- NA_character_
+    out
+  }
+  out[, `:=`(ref = rc(ref), alt = rc(alt))]
   out[]
 }
 
@@ -514,7 +516,7 @@ annotation_variant_consequence <- function(type, genome_pos, ref, alt, structure
 
 #' Annotate one haplotype against one transcript
 annotation_haplotype_transcript <- function(hap_seq, structure, genomic, ops,
-                                            genetic_code) {
+                                            genetic_code, with_proteins = FALSE) {
   frame <- annotation_cds_frame(structure, genomic, ops)
   ref_cds <- frame$cds_seq
   # Variants whose anchor maps outside any CDS block (intron, or the few bases
@@ -591,7 +593,8 @@ annotation_haplotype_transcript <- function(hap_seq, structure, genomic, ops,
     consequence = consequence,
     protein_change = .annotation_protein_change(ref_p, alt_p,
                                                 frameshift = frameshift, delta = delta),
-    ref_protein = ref_p, alt_protein = alt_p,
+    ref_protein = if (with_proteins) ref_p else NA_character_,
+    alt_protein = if (with_proteins) alt_p else NA_character_,
     n_aa_changed = .annotation_count_aa_diff(ref_p, alt_p),
     ref_protein_length = nchar(ref_p), alt_protein_length = nchar(alt_p),
     notes = if (frameshift) sprintf("length change %+d bp (not a multiple of 3)", delta) else NA_character_
@@ -645,6 +648,90 @@ annotation_haplotype_transcript <- function(hap_seq, structure, genomic, ops,
 }
 
 # ---------------------------------------------------------------------------
+# Variant-level detail (--annotation-detail)
+# ---------------------------------------------------------------------------
+
+#' Per-variant annotation within a transcript
+#'
+#' Each variant is described on its own: its consequence, the codon it touches
+#' and the amino-acid change it causes. This is deliberately separate from the
+#' haplotype-level pass -- the joint consequence of several variants can differ
+#' from any single-variant description, which is why the haplotype table remains
+#' the primary deliverable.
+annotation_variant_detail <- function(ops, structure, genetic_code) {
+  if (is.null(ops) || nrow(ops) == 0) return(NULL)
+  ops <- data.table::as.data.table(ops)
+  blocks <- structure$cds
+  if (nrow(blocks) == 0) return(NULL)
+  cds_seq <- structure$cds_seq
+  cds_lo <- min(blocks$start); cds_hi <- max(blocks$end)
+  # relative position of each genomic coordinate inside the spliced CDS
+  cds_pos_of <- function(gp) {
+    if (gp < cds_lo || gp > cds_hi) return(NA_integer_)
+    vapply(gp, function(g) {
+      for (i in seq_len(nrow(blocks))) {
+        if (g >= blocks$start[i] && g <= blocks$end[i]) {
+          before <- sum(pmax(0L, blocks$end[seq_len(i - 1L)] -
+                               blocks$start[seq_len(i - 1L)] + 1L))
+          return(as.integer(before + (g - blocks$start[i]) + 1L))
+        }
+      }
+      NA_integer_
+    }, integer(1))
+  }
+  rows <- vector("list", nrow(ops))
+  for (i in seq_len(nrow(ops))) {
+    gp <- as.integer(ops$genome_pos[i])
+    type <- as.character(ops$type[i])
+    cp <- cds_pos_of(gp)
+    con <- "outside_cds"; codon_ref <- NA_character_
+    codon_alt <- NA_character_; aa_ref <- NA_character_; aa_alt <- NA_character_
+    if (!is.na(cp)) {
+      if (type %in% c("del", "delregion")) {
+        n <- nchar(as.character(ops$ref[i]))
+        con <- if (n %% 3L == 0L) "inframe_deletion" else "frameshift"
+      } else if (identical(type, "ins")) {
+        n <- nchar(as.character(ops$alt[i]))
+        con <- if (n %% 3L == 0L) "inframe_insertion" else "frameshift"
+      } else {
+        # substitution: apply it alone and read the codon it changes
+        op1 <- ops[i, .(type, pos = cp, ref, alt)]
+        alt_cds <- .annotation_apply_ops(cds_seq, op1)
+        tr_ref <- .annotation_translate(cds_seq, genetic_code)
+        tr_alt <- .annotation_translate(
+          substr(alt_cds, 1L, nchar(alt_cds) - (nchar(alt_cds) %% 3L)), genetic_code)
+        if (isTRUE(tr_ref$ok) && isTRUE(tr_alt$ok)) {
+          ci <- (cp - 1L) %/% 3L + 1L
+          codon_ref <- substr(cds_seq, (ci - 1L) * 3L + 1L, ci * 3L)
+          codon_alt <- substr(alt_cds, (ci - 1L) * 3L + 1L, ci * 3L)
+          a0 <- substr(tr_ref$protein, ci, ci)
+          a1 <- substr(tr_alt$protein, ci, ci)
+          aa_ref <- a0; aa_alt <- a1
+          con <- if (identical(a0, a1)) {
+            "synonymous"
+          } else if (identical(a1, "*")) {
+            "stop_gained"
+          } else if (identical(a0, "*")) {
+            "stop_lost"
+          } else {
+            "missense"
+          }
+        }
+      }
+    }
+    rows[[i]] <- data.table::data.table(
+      type = type, genome_pos = gp, cds_pos = cp,
+      ref = ops$ref[i], alt = ops$alt[i],
+      codon_ref = codon_ref, codon_alt = codon_alt,
+      aa_ref = aa_ref, aa_alt = aa_alt,
+      consequence_en = con, consequence_zh = consequence_zh(con),
+      transcript_id = structure$transcript_id
+    )
+  }
+  data.table::rbindlist(rows, use.names = TRUE)
+}
+
+# ---------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------
 
@@ -658,7 +745,8 @@ annotation_haplotype_transcript <- function(hap_seq, structure, genomic, ops,
 #' @param list_only when TRUE only the candidate transcript table is printed
 #' @return list(available, table, qc, manifest, message)
 run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
-                           list_only = FALSE, quiet = FALSE) {
+                           list_only = FALSE, quiet = FALSE,
+                           include_proteins = FALSE, include_detail = FALSE) {
   # Provider preflight only for the genome route. Route "cds" is the offline
   # path: it works from an explicit CDS span with translation alone and must not
   # require any network access.
@@ -706,6 +794,7 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
   }
 
   rows <- list()
+  detail_rows <- list()
   qc_extra <- list()
   manifest_tr <- list()
 
@@ -766,11 +855,19 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
         annotation_variants_to_genomic(ops, frame)
       }
       res <- annotation_haplotype_transcript(hap$sequence[h], structure, frame,
-                                             gops, cfg$genetic_code_vector)
+                                             gops, cfg$genetic_code_vector,
+                                             with_proteins = isTRUE(include_proteins))
       con <- if (is.na(res$consequence)) {
         if (nrow(ops) == 0) "no_variant" else "outside_cds"
       } else {
         res$consequence
+      }
+      if (isTRUE(include_detail) && nrow(gops) > 0) {
+        d <- annotation_variant_detail(gops, structure, cfg$genetic_code_vector)
+        if (!is.null(d) && nrow(d) > 0) {
+          d[, haplotype_id := hap$haplotype_id[h]]
+          detail_rows[[length(detail_rows) + 1L]] <- d
+        }
       }
       rows[[length(rows) + 1L]] <- data.table::data.table(
         haplotype_id = hap$haplotype_id[h],
@@ -791,6 +888,10 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
         signature = hap$signature[h],
         notes = res$notes
       )
+      if (isTRUE(include_proteins)) {
+        rows[[length(rows)]][, `:=`(ref_protein = res$ref_protein,
+                                    alt_protein = res$alt_protein)]
+      }
     }
   }
 
@@ -832,6 +933,14 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
     n_transcript_conflicts = uniqueN(out$haplotype_id[out$transcript_conflict == TRUE])
   )
   write_tsv(out, file.path(outdir, "annotation.tsv"))
+  if (isTRUE(include_detail) && length(detail_rows) > 0) {
+    det <- data.table::rbindlist(detail_rows, use.names = TRUE, fill = TRUE)
+    data.table::setcolorder(det, c("haplotype_id", "transcript_id", "type",
+                                   "genome_pos", "cds_pos", "ref", "alt",
+                                   "codon_ref", "codon_alt", "aa_ref", "aa_alt",
+                                   "consequence_en", "consequence_zh"))
+    write_tsv(det, file.path(outdir, "variants_annotation.tsv"))
+  }
   invisible(list(
     available = TRUE, table = out, qc = qc_extra,
     candidates = ctx$candidates,
@@ -881,7 +990,8 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
 #' callers can stay unchanged when annotation is off (the default).
 annotation_pass <- function(config_path, ref, hap, variants, outdir,
                             list_only = FALSE, haplotype_id_col = "haplotype_id",
-                            quiet = FALSE) {
+                            quiet = FALSE, include_proteins = FALSE,
+                            include_detail = FALSE) {
   if (is.null(config_path) || is.na(config_path) || !nzchar(config_path)) {
     return(list(available = FALSE))
   }
@@ -912,7 +1022,8 @@ annotation_pass <- function(config_path, ref, hap, variants, outdir,
   }
   res <- run_annotation(
     ref_seq = ref$sequence, hap = h, variants = variants,
-    outdir = outdir, cfg = cfg, list_only = list_only, quiet = quiet
+    outdir = outdir, cfg = cfg, list_only = list_only, quiet = quiet,
+    include_proteins = include_proteins, include_detail = include_detail
   )
   res
 }

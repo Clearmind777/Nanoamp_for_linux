@@ -223,10 +223,14 @@ test_that("amplicon variants map to genomic coordinates through the frame", {
   expect_equal(out$type, c("snv", "ins", "del"))
 })
 
-test_that("minus-strand amplicons are refused rather than mis-mapped", {
-  ops <- data.table::data.table(type = "snv", pos = 5L, ref = "A", alt = "G")
+test_that("minus-strand frames map coordinates and alleles", {
+  # Covered in depth by the mirror test; this pins the arithmetic.
+  ops <- data.table::data.table(type = "snv", pos = 1L, ref = "A", alt = "G")
   g <- list(chrom = "19", start = 1001L, end = 1100L, strand = "-")
-  expect_error(annotation_variants_to_genomic(ops, g), "minus strand")
+  out <- annotation_variants_to_genomic(ops, g)
+  expect_equal(out$genome_pos, 1100L)      # amplicon position 1 == frame end
+  expect_equal(out$ref, "T")               # A on the amplicon is T on the genome
+  expect_equal(out$alt, "C")
 })
 
 test_that("the anchor finds the 5-prime end of a partially matching reference", {
@@ -266,9 +270,15 @@ test_that("route cds builds a frame offline, without any reference provider", {
   st <- nanoamp:::.annotation_cds_route_structure("synthetic", ctx$cds, ref)
   expect_true(st$ok)
   expect_equal(st$cds_seq, ref)
-  # V1 needs Ensembl, so offline it reports a problem rather than passing
-  v1 <- annotation_verify_reference_protein(st, Biostrings::GENETIC_CODE)
+  # V1 compares against the protein Ensembl serves, which is unavailable here.
+  # retries = 1 keeps this test offline and fast; the result must be a reported
+  # problem rather than a silent pass.
+  old_base <- nanoamp:::.ensembl_base
+  assignInNamespace(".ensembl_base", "http://127.0.0.1:9", ns = "nanoamp")
+  on.exit(assignInNamespace(".ensembl_base", old_base, ns = "nanoamp"), add = TRUE)
+  v1 <- annotation_verify_reference_protein(st, Biostrings::GENETIC_CODE, retries = 1L)
   expect_false(v1$ok)
+  expect_true(nzchar(v1$problem))
 })
 
 test_that("an unreachable provider is reported as a problem, not swallowed", {
@@ -291,4 +301,106 @@ test_that("an unreachable provider is reported as a problem, not swallowed", {
   })
   # either the environment has connectivity (ok) or it aborted with advice
   expect_true(isTRUE(ok) || identical(ok, FALSE))
+})
+
+test_that("minus-strand frames mirror the plus-strand result", {
+  # The same biological variant described in a plus-strand frame and in the
+  # reverse-complemented (minus-strand) frame must produce identical
+  # consequences. This is the test that guards the coordinate flip.
+  set.seed(7)
+  g <- paste0(sample(c("A", "C", "G", "T"), 300, TRUE), collapse = "")
+  cs <- 51L; ce <- 200L
+  g <- paste0(substr(g, 1, cs - 1), "ATG", substr(g, cs + 3, ce - 3), "TAA",
+              substr(g, ce + 1, nchar(g)))
+  blocks <- data.table::data.table(chrom = "S", start = cs, end = ce, strand = 1L,
+                                   phase = 0L, protein_id = "P")
+  st <- list(transcript_id = "P", exons = blocks, cds = blocks,
+             cds_seq = substr(g, cs, ce), ok = TRUE, problem = NA_character_,
+             chrom = "S", strand = 1L)
+
+  g0 <- 1001L; glen <- nchar(g)
+  plus_frame <- list(chrom = "S", start = g0, end = g0 + glen - 1L, strand = "+")
+  minus_frame <- list(chrom = "S", start = g0, end = g0 + glen - 1L, strand = "-")
+
+  gpos <- cs + 9L * 3L                       # first base of codon 10
+  ref_base <- substr(g, gpos, gpos)
+  alt_base <- setdiff(c("A", "C", "G", "T"), ref_base)[1]
+
+  # plus strand: amplicon position = genome position - frame start + 1
+  ops_plus <- data.table::data.table(type = "snv", pos = gpos - g0 + 1L,
+                                     ref = ref_base, alt = alt_base)
+  gp <- annotation_variants_to_genomic(ops_plus, plus_frame)
+  expect_equal(gp$genome_pos, gpos)
+  plus <- annotation_haplotype_transcript(NULL, st, plus_frame, gp,
+                                          Biostrings::GENETIC_CODE)
+
+  # minus strand: the amplicon is the reverse complement, so the amplicon
+  # position counts down from the frame end and the alleles are flipped
+  rc <- function(x) as.character(Biostrings::reverseComplement(Biostrings::DNAStringSet(x)))
+  ops_minus <- data.table::data.table(
+    type = "snv", pos = minus_frame$end - gpos + 1L,
+    ref = rc(ref_base), alt = rc(alt_base)
+  )
+  gm <- annotation_variants_to_genomic(ops_minus, minus_frame)
+  expect_equal(gm$genome_pos, gpos)
+  expect_equal(gm$ref, ref_base)
+  expect_equal(gm$alt, alt_base)
+  minus <- annotation_haplotype_transcript(NULL, st, minus_frame, gm,
+                                           Biostrings::GENETIC_CODE)
+
+  expect_equal(minus$consequence, plus$consequence)
+  expect_equal(minus$protein_change, plus$protein_change)
+})
+
+test_that("minus-strand insertions are anchored one base further", {
+  # An insertion sits between pos-1 and pos in the amplicon's own orientation,
+  # which on the minus strand is the base after the insertion point.
+  frame <- list(chrom = "19", start = 1001L, end = 1100L, strand = "-")
+  ins <- data.table::data.table(type = "ins", pos = 10L, ref = "", alt = "AAA")
+  out <- annotation_variants_to_genomic(ins, frame)
+  expect_equal(out$genome_pos, 1100L - 10L + 2L)
+  # a deletion anchors on its first reference base
+  del <- data.table::data.table(type = "del", pos = 10L, ref = "TT", alt = "")
+  out2 <- annotation_variants_to_genomic(del, frame)
+  expect_equal(out2$genome_pos, 1100L - 10L + 1L)
+  expect_equal(out2$ref, "AA")
+})
+
+test_that("variant-level consequences cover the rule table", {
+  # A single-block transcript on the plus strand, CDS from 101 to 160.
+  cds <- "ATGAAATTTGGGCCCTAA"
+  blocks <- data.table::data.table(chrom = "S", start = 101L, end = 100L + nchar(cds),
+                                   strand = 1L, phase = 0L, protein_id = "P")
+  st <- list(transcript_id = "P", exons = blocks, cds = blocks, cds_seq = cds,
+             ok = TRUE, problem = NA_character_, chrom = "S", strand = 1L)
+
+  # inside the CDS: a missense at codon 2
+  expect_equal(
+    annotation_variant_consequence("snv", 104L, "A", "G", st, Biostrings::GENETIC_CODE, 101L, 180L),
+    "coding_snv"
+  )
+  # before the CDS but inside the amplicon -> UTR / intron
+  expect_equal(
+    annotation_variant_consequence("snv", 50L, "A", "G", st, Biostrings::GENETIC_CODE, 1L, 300L),
+    "intron"
+  )
+  # a non-multiple-of-three deletion is a frameshift
+  expect_equal(
+    annotation_variant_consequence("del", 104L, "AA", "", st, Biostrings::GENETIC_CODE, 1L, 300L),
+    "frameshift"
+  )
+  # a three-base deletion is in-frame
+  expect_equal(
+    annotation_variant_consequence("del", 104L, "AAA", "", st, Biostrings::GENETIC_CODE, 1L, 300L),
+    "inframe_deletion"
+  )
+  # a three-base insertion is in-frame, a one-base insertion is not
+  expect_equal(
+    annotation_variant_consequence("ins", 104L, "", "AAA", st, Biostrings::GENETIC_CODE, 1L, 300L),
+    "inframe_insertion"
+  )
+  expect_equal(
+    annotation_variant_consequence("ins", 104L, "", "A", st, Biostrings::GENETIC_CODE, 1L, 300L),
+    "frameshift"
+  )
 })

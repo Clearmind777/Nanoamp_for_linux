@@ -175,7 +175,8 @@ run_mode_b <- function(reads_path, reference_path, outdir,
                        aligner = c("minimap2", "r"), use_samtools = FALSE,
                        threads = 4L, keep_intermediates = TRUE,
                        ref_label = NULL, annotation = NULL,
-                       list_transcripts = FALSE) {
+                       list_transcripts = FALSE, annotation_proteins = FALSE,
+                       annotation_detail = FALSE) {
   aligner <- match.arg(aligner, c("minimap2", "r"))
   outdir <- ensure_dir(outdir)
   ref <- read_reference(reference_path)
@@ -299,7 +300,9 @@ run_mode_b <- function(reads_path, reference_path, outdir,
   )
   ann <- annotation_pass(annotation, ref, clusters, NULL, outdir,
                          list_only = list_transcripts,
-                         haplotype_id_col = "cluster_id")
+                         haplotype_id_col = "cluster_id",
+                         include_proteins = annotation_proteins,
+                         include_detail = annotation_detail)
   if (isTRUE(ann$available)) qc <- c(qc, ann$qc)
   write_tsv(build_qc_table(qc), file.path(outdir, "qc.tsv"))
   run_manifest(outdir, "B", list(

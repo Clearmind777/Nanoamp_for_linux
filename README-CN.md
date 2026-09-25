@@ -116,7 +116,20 @@ sh 02_code/cli/nanoamp call \
 
 # ……或注释全部重叠转录本
 sh 02_code/cli/nanoamp call ... --annotate-config cfg.json --transcript all
+
+# 附带蛋白序列，以及每个变异的逐条明细
+sh 02_code/cli/nanoamp call ... --annotate-config cfg.json \
+  --annotation-proteins --annotation-detail
 ```
+
+注释产出：
+
+| 文件 | 内容 |
+|---|---|
+| `annotation.tsv` | 每个单倍型 × 每个所选转录本一行（中英双列后果、蛋白变化） |
+| `variants_annotation.tsv` | 仅 `--annotation-detail`：每个变异一行，含密码子与氨基酸变化 |
+| `qc.tsv` | 追加注释统计（转录本数、各类后果计数、冲突数） |
+| `run_manifest.json` | 追加 `annotation` 段（来源、Ensembl release、配置、转录本校验结果） |
 
 ### 参考信息从哪来
 

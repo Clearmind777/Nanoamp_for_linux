@@ -145,3 +145,26 @@ n_missense  n_synonymous  n_inframe  n_transcript_conflicts
                      "protein_length": 0, "protein_verified": true } ]
 }
 ```
+
+## variants_annotation.tsv（变异级明细，可选）
+
+仅当 `--annotation-detail` 时生成：每个变异一行。
+
+| 列名 | 说明 |
+|---|---|
+| `haplotype_id` | 所属单倍型；`transcript_id` 为所用转录本 |
+| `type` | `snv` / `ins` / `del` / `delregion` |
+| `genome_pos` | 基因组坐标（1-based） |
+| `cds_pos` | 该变异在拼接后 CDS 中的位置；空表示不在 CDS 内 |
+| `ref` / `alt` | 基因组正链上的等位基因（负链已翻转） |
+| `codon_ref` / `codon_alt` | 受影响密码子（仅替换类变异） |
+| `aa_ref` / `aa_alt` | 对应氨基酸（仅替换类变异） |
+| `consequence_en` / `consequence_zh` | 单变异后果（中英双列） |
+
+注意：这是**单变异**视角。多变异组合的最终后果以 `annotation.tsv` 为准——两者可能不同。
+
+### 负链支持
+
+定位到负链时，`genome_pos` 按 `end - pos + 1` 换算（插入为 `end - pos + 2`，因为插入锚定在
+插入点之后），等位基因反向互补，使所有操作都能作用在正链序列上。正链与负链表述的同一变异
+必须得到相同后果（由镜像测试保证）。

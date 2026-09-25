@@ -121,7 +121,8 @@ run_mode_a <- function(reads_path, reference_path, outdir,
                        aligner = c("minimap2", "r"), use_samtools = FALSE,
                        threads = 4L, keep_intermediates = TRUE,
                        ref_label = NULL, annotation = NULL,
-                       list_transcripts = FALSE) {
+                       list_transcripts = FALSE, annotation_proteins = FALSE,
+                       annotation_detail = FALSE) {
   aligner <- match.arg(aligner, c("minimap2", "r"))
   outdir <- ensure_dir(outdir)
   ref <- read_reference(reference_path)
@@ -194,7 +195,9 @@ run_mode_a <- function(reads_path, reference_path, outdir,
     exact_reference_proportion = round(hap[is_reference == TRUE, sum(proportion)], 6)
   )
   ann <- annotation_pass(annotation, ref, hap, disc$variants, outdir,
-                         list_only = list_transcripts)
+                         list_only = list_transcripts,
+                         include_proteins = annotation_proteins,
+                         include_detail = annotation_detail)
   if (isTRUE(ann$available)) {
     qc <- c(qc, ann$qc)
   }

@@ -315,23 +315,23 @@ annotation_empty_blocks <- function() {
 }
 
 #' Reference CDS sequence for a transcript, as served by Ensembl
-annotation_cds_sequence <- function(transcript_id) {
-  annotation_sequence_id(transcript_id, "cds")
+annotation_cds_sequence <- function(transcript_id, retries = 5L) {
+  annotation_sequence_id(transcript_id, "cds", retries = retries)
 }
 
 #' Reference protein sequence for a transcript, as served by Ensembl
-annotation_protein_sequence <- function(transcript_id) {
-  annotation_sequence_id(transcript_id, "protein")
+annotation_protein_sequence <- function(transcript_id, retries = 5L) {
+  annotation_sequence_id(transcript_id, "protein", retries = retries)
 }
 
-annotation_sequence_id <- function(transcript_id, type) {
+annotation_sequence_id <- function(transcript_id, type, retries = 5L) {
   cache <- .annotation_cache_path(
     "sequences", sprintf("%s.%s", transcript_id, type), ".txt"
   )
   if (file.exists(cache)) return(.read_sequence_file(cache))
   url <- sprintf("%s/sequence/id/%s?type=%s&content-type=text/plain",
                  .ensembl_base, transcript_id, type)
-  txt <- .http_get(url)
+  txt <- .http_get(url, retries = retries)
   writeLines(txt, cache)
   .read_sequence_file(cache)
 }

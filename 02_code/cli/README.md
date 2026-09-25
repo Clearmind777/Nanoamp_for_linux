@@ -35,7 +35,8 @@ nanoamp help
 | `--annotate-config` | path | none | Enable functional annotation with this JSON config |
 | `--transcript` | string | none | Transcript id to annotate, or `all` for every overlapping transcript |
 | `--list-transcripts` | flag | false | Print the candidate transcripts for the amplicon |
-| `--annotation-proteins` | flag | false | Include reference/alternate protein sequences in `annotation.tsv` (planned) |
+| `--annotation-proteins` | flag | false | Include reference/alternate protein sequences in `annotation.tsv` |
+| `--annotation-detail` | flag | false | Also write `variants_annotation.tsv` (per-variant consequences) |
 | `--clear-cache` | flag | false | Clear the annotation reference cache and exit |
 | `--no-cache` | flag | false | Ignore cached reference slices and re-fetch them |
 | `--cache-dir` | path | `$XDG_CACHE_HOME/nanoamp/ref` | Cache location |

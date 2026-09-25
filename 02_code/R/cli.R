@@ -57,7 +57,9 @@ cli_call_options <- function() {
     optparse::make_option(c("--no-cache"), action = "store_true", default = FALSE,
                           help = "Ignore cached reference slices and re-fetch them"),
     optparse::make_option(c("--annotation-proteins"), action = "store_true", default = FALSE,
-                          help = "Include reference and alternate protein sequences in annotation.tsv")
+                          help = "Include reference and alternate protein sequences in annotation.tsv"),
+    optparse::make_option(c("--annotation-detail"), action = "store_true", default = FALSE,
+                          help = "Also write variants_annotation.tsv with per-variant consequences")
   )
 }
 
@@ -81,7 +83,8 @@ cli_batch_options <- function() {
     optparse::make_option(c("--list-transcripts"), action = "store_true", default = FALSE),
     optparse::make_option(c("--clear-cache"), action = "store_true", default = FALSE),
     optparse::make_option(c("--no-cache"), action = "store_true", default = FALSE),
-    optparse::make_option(c("--annotation-proteins"), action = "store_true", default = FALSE)
+    optparse::make_option(c("--annotation-proteins"), action = "store_true", default = FALSE),
+    optparse::make_option(c("--annotation-detail"), action = "store_true", default = FALSE)
   )
 }
 
@@ -113,7 +116,9 @@ cli_cmd_call <- function(args) {
     keep_intermediates = !isTRUE(opt$`no-intermediates`),
     ref_label = opt$`ref-label`,
     annotation = config_path,
-    list_transcripts = isTRUE(opt$`list-transcripts`)
+    list_transcripts = isTRUE(opt$`list-transcripts`),
+    annotation_proteins = isTRUE(opt$`annotation-proteins`),
+    annotation_detail = isTRUE(opt$`annotation-detail`)
   )
   invisible(TRUE)
 }

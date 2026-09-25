@@ -129,7 +129,20 @@ sh 02_code/cli/nanoamp call \
 
 # ...or against every overlapping transcript
 sh 02_code/cli/nanoamp call ... --annotate-config cfg.json --transcript all
+
+# with protein sequences, and per-variant detail
+sh 02_code/cli/nanoamp call ... --annotate-config cfg.json \
+  --annotation-proteins --annotation-detail
 ```
+
+Annotation outputs:
+
+| File | Content |
+|---|---|
+| `annotation.tsv` | one row per haplotype x selected transcript (bilingual consequence, protein change) |
+| `variants_annotation.tsv` | only with `--annotation-detail`: one row per variant, with codons and amino acids |
+| `qc.tsv` | extra annotation metrics (transcript count, consequence counts, conflicts) |
+| `run_manifest.json` | an `annotation` block (source, Ensembl release, config, transcript checks) |
 
 ### Where the reference comes from
 

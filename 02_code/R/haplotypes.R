@@ -35,6 +35,10 @@
 #'   `00_materials/optional_function.md`.
 #' @param list_transcripts When TRUE only the candidate transcript table is
 #'   printed and no analysis is run.
+#' @param annotation_proteins Include reference/alternate protein sequences in
+#'   `annotation.tsv`.
+#' @param annotation_detail Also write `variants_annotation.tsv` with the
+#'   per-variant consequences.
 #'
 #' @return A list with `haplotypes`, `variants` and `qc` elements.
 #' @export
@@ -54,7 +58,9 @@ run_haplotype_analysis <- function(reads, reference, outdir,
                                    keep_intermediates = TRUE,
                                    ref_label = NULL,
                                    annotation = NULL,
-                                   list_transcripts = FALSE) {
+                                   list_transcripts = FALSE,
+                                   annotation_proteins = FALSE,
+                                   annotation_detail = FALSE) {
   mode <- toupper(match.arg(mode, c("A", "B", "C")))
   switch(
     mode,
@@ -66,7 +72,9 @@ run_haplotype_analysis <- function(reads, reference, outdir,
       aligner = aligner, use_samtools = use_samtools,
       threads = threads, keep_intermediates = keep_intermediates,
       ref_label = ref_label, annotation = annotation,
-      list_transcripts = list_transcripts
+      list_transcripts = list_transcripts,
+      annotation_proteins = annotation_proteins,
+      annotation_detail = annotation_detail
     ),
     B = run_mode_b(
       reads, reference, outdir, top_n = top_n,
@@ -76,7 +84,9 @@ run_haplotype_analysis <- function(reads, reference, outdir,
       aligner = aligner, use_samtools = use_samtools,
       threads = threads, keep_intermediates = keep_intermediates,
       ref_label = ref_label, annotation = annotation,
-      list_transcripts = list_transcripts
+      list_transcripts = list_transcripts,
+      annotation_proteins = annotation_proteins,
+      annotation_detail = annotation_detail
     ),
     C = run_mode_c(
       reads, reference, outdir, top_n = top_n,

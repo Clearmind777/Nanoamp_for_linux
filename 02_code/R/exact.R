@@ -5,7 +5,8 @@
 run_mode_c <- function(reads_path, reference_path, outdir,
                        top_n = 20L, keep_intermediates = TRUE,
                        ref_label = NULL, annotation = NULL,
-                       list_transcripts = FALSE) {
+                       list_transcripts = FALSE, annotation_proteins = FALSE,
+                       annotation_detail = FALSE) {
   outdir <- ensure_dir(outdir)
   ref <- read_reference(reference_path)
   fq <- read_fastq(reads_path)

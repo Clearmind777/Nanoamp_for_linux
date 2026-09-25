@@ -417,6 +417,21 @@ annotation_default_chroms <- function() {
                 method = if (full) "exact_match" else "exact_anchor",
                 window_bp = nchar(seq)))
   }
+  # Minus strand: the reference is the reverse complement of the genomic strand.
+  rc_seq <- as.character(Biostrings::reverseComplement(Biostrings::DNAStringSet(seq)))
+  anc_rc <- .annotation_anchor(ref_seq, rc_seq)
+  if (anc_rc$len >= 40L) {
+    # position of the anchor inside the forward window, then flipped
+    rc_off <- anc_rc$seq_off
+    gs <- start + (nchar(seq) - (rc_off + anc_rc$len - 1L) - 1L) - (anc_rc$ref_off - 1L)
+    full <- anc_rc$len == n
+    return(list(chrom = chrom, start = gs, end = gs + n - 1L, strand = "-",
+                identity = round(anc_rc$len / n, 4), n_mismatch = n - anc_rc$len,
+                anchor_len = anc_rc$len,
+                anchor_coverage = round(anc_rc$len / n, 4),
+                method = if (full) "exact_match_reverse" else "exact_anchor_reverse",
+                window_bp = nchar(seq)))
+  }
   # fall back to local alignment for edited references
   aln <- tryCatch(
     pa_pairwise_alignment(Biostrings::DNAString(ref_seq), Biostrings::DNAString(seq),

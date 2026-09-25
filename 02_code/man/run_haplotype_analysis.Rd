@@ -26,7 +26,9 @@ run_haplotype_analysis(
   keep_intermediates = TRUE,
   ref_label = NULL,
   annotation = NULL,
-  list_transcripts = FALSE
+  list_transcripts = FALSE,
+  annotation_proteins = FALSE,
+  annotation_detail = FALSE
 )
 }
 \arguments{
@@ -79,6 +81,12 @@ functional annotation pass runs and writes `annotation.tsv`. See
 
 \item{list_transcripts}{When TRUE only the candidate transcript table is
 printed and no analysis is run.}
+
+\item{annotation_proteins}{Include reference/alternate protein sequences in
+`annotation.tsv`.}
+
+\item{annotation_detail}{Also write `variants_annotation.tsv` with the
+per-variant consequences.}
 }
 \value{
 A list with `haplotypes`, `variants` and `qc` elements.
