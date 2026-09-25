@@ -268,24 +268,38 @@ SSH 认证正常，因此 **`git push` 可用而 GitHub Release 的创建需要�
 
 ## 8. 交付给用户的发布操作
 
-```bash
-# 1) 提交本轮改动并打 tag
-git add -A && git commit -m "release: v0.1.0 artifacts, README/structure cleanup"
-git tag -a v0.1.0 -m "nanoamp v0.1.0"
-git push origin main
-git push origin v0.1.0
+已完成（本轮）：提交 `5eacf9b`（release 产物与说明）+ `0d7ab34`（发布脚本修正），
+annotated tag `v0.1.0`，`git push origin main` 与 `git push origin v0.1.0` 均成功。
+远端核验：默认分支 `main`，根 README 已是中文（`**中文** | [English](README-EN.md)`），
+tag `v0.1.0^{}` = `5eacf9b`，且远端当前**没有任何 Release**。
 
-# 2) 发布 GitHub Release（三选一）
-brew install gh && gh auth login && ./release/publish_github_release.sh
-# 或
+**剩余一步**：本机没有 GitHub API 凭据，创建 Release 需要用户授权。
+
+```bash
+# 1) gh 已装好（2.101.0，/opt/homebrew/bin/gh），只差一次交互式登录：
+gh auth login            # 选 GitHub.com -> HTTPS -> Login with a web browser
+gh auth status           # 确认已登录
+
+# 2) 一键发布（幂等；Release 已存在时覆盖同名附件）
+./release/publish_github_release.sh      # 或 make release-publish
+
+# 3) 若不想用 gh，也可用 token：
 GH_TOKEN=<token> ./release/publish_github_release.sh
-# 或用浏览器：https://github.com/Clearmind777/Nanoamp_for_linux/releases/new?tag=v0.1.0
-#            正文粘贴 release/RELEASE_NOTES.md，附件拖入 release/ 下 3 个产物
 ```
+
+若两者都不做，可在浏览器打开
+`https://github.com/Clearmind777/Nanoamp_for_linux/releases/new?tag=v0.1.0`，
+正文粘贴 `release/RELEASE_NOTES.md`，附件拖入 `release/` 下 3 个产物
+（`nanoamp-0.1.0-src.tar.gz` 67 MB、`nanoamp-0.1.0-src.zip` 67 MB、
+`nanoamp-0.1.0-R-package.tar.gz` 71 KB）。
+
+发布脚本的健壮性已单独验证：`bash -n` 通过、`DRY_RUN=1` 通过、无凭据时正确 `exit 1`
+并打印三条可选路径、会自动把 `/opt/homebrew/bin` 补进 `PATH`（非登录 shell 常见缺失）。
 
 ## 9. 遗留问题
 
-- **无凭据**：GitHub Release 的创建未能在本机完成，需要用户提供 token 或登录 `gh`。
+- **GitHub Release 尚未创建**：缺少 API 凭据，需要用户 `gh auth login` 或提供 token
+  （代码、tag、归档、校验和、发布说明均已就绪，只差最后一步上传）。
 - **`All` 模式较慢**：受 Ensembl 节流（1.1 s/请求）限制，建议先用 `--list-transcripts`。
 - **负链仅有合成镜像测试**：`01_data` 中所有目标都定位在正链，缺少真实负链数据集。
 - **TUI 未提供注释界面**：见 `TUI_plan.1.md` 的转录本多选设计。
