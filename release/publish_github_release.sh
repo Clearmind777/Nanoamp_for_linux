@@ -51,6 +51,20 @@ info "仓库: $REPO    tag: $TAG    release: $VERSION"
 
 # --- 2. 校验产物 -----------------------------------------------------------
 [[ -f release/SHA256SUMS ]] || die "缺少 release/SHA256SUMS"
+
+# SHA256SUMS 列出的归档文件不入 git，必须先在本地构建，否则下面的 sha256sum -c
+# 只会打印一串 "No such file or directory"。这里先给出可执行的提示。
+missing="$(awk 'NF>=2 {print $2}' release/SHA256SUMS | sed 's/^\*//' | while read -r f; do
+  [[ -f "release/$f" ]] || echo "$f"
+done)"
+if [[ -n "$missing" ]]; then
+  printf 'ERROR: 以下发布产物不存在:\n' >&2
+  while read -r f; do printf '  - release/%s\n' "$f" >&2; done <<< "$missing"
+  printf '发布归档不入 git（见 release/README.md），需要先在本地构建:\n' >&2
+  printf '  make release        # 等价于 bash 02_code/scripts/mk-release.sh --ref %s\n' "$TAG" >&2
+  exit 1
+fi
+
 info "校验产物校验和"
 if command -v sha256sum >/dev/null 2>&1; then
   (cd release && sha256sum -c SHA256SUMS)

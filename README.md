@@ -133,6 +133,11 @@ sh 02_code/cli/nanoamp call ... --annotate-config cfg.json \
 | `qc.tsv` | 追加注释统计（转录本数、各类后果计数、冲突数） |
 | `run_manifest.json` | 追加 `annotation` 段（来源、Ensembl release、配置、转录本校验结果） |
 
+请求了注释却没能产出时（例如配置里的 CDS 长度不是 3 的倍数），运行仍以退出码 0
+结束，但 `qc.tsv` 会写 `annotation_available = FALSE` 与 `annotation_skip_reason`，
+`run_manifest.json` 会写 `annotation.available = false` 与 `annotation.skipped_transcripts`。
+**判断有没有注释请以这两个字段为准，不要只看 `annotation.tsv` 在不在。**
+
 ### 参考信息从哪来
 
 **不需要手工下载任何文件。** 程序自己在 GRCh38 上定位扩增子，并从 Ensembl REST API
@@ -144,7 +149,8 @@ ${XDG_CACHE_HOME:-~/.cache}/nanoamp/ref/
 ```
 
 `--clear-cache` 清空，`--no-cache` 强制重取，`--cache-dir` 改位置。所用 Ensembl
-release 会记入 `run_manifest.json`；需要固定参考版本时用 `--ensembl-release N`。
+release 会记入 `run_manifest.json` 的 `annotation.ensembl_release`，复核时以它为准。
+**v0.1.0 还没有 `--ensembl-release`**（钉死历史 release 需要 Ensembl 归档主机，留待后续版本）。
 
 ### 两条路线，同一套管线
 

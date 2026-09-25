@@ -146,6 +146,13 @@ Annotation outputs:
 | `qc.tsv` | extra annotation metrics (transcript count, consequence counts, conflicts) |
 | `run_manifest.json` | an `annotation` block (source, Ensembl release, config, transcript checks) |
 
+When annotation is requested but cannot be produced (for example a CDS in the
+config whose length is not a multiple of 3), the run still exits 0, but `qc.tsv`
+gets `annotation_available = FALSE` plus `annotation_skip_reason`, and
+`run_manifest.json` gets `annotation.available = false` plus
+`annotation.skipped_transcripts`. **Use those fields to tell whether a run was
+annotated; the presence of `annotation.tsv` alone is not enough.**
+
 ### Where the reference comes from
 
 There is nothing to download by hand. The program locates the amplicon in
@@ -159,8 +166,10 @@ ${XDG_CACHE_HOME:-~/.cache}/nanoamp/ref/
 ```
 
 `--clear-cache` empties it, `--no-cache` re-fetches, `--cache-dir` relocates it.
-The Ensembl release used is recorded in `run_manifest.json`, and
-`--ensembl-release N` pins a specific one when a reproducible reference matters.
+The Ensembl release used is recorded in `run_manifest.json` as
+`annotation.ensembl_release` — quote that value when reporting results.
+**v0.1.0 does not implement `--ensembl-release`** (pinning a historical release
+needs the Ensembl archive hosts); that is left for a later version.
 
 ### Two routes, one pipeline
 

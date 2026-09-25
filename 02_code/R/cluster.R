@@ -303,7 +303,9 @@ run_mode_b <- function(reads_path, reference_path, outdir,
                          haplotype_id_col = "cluster_id",
                          include_proteins = annotation_proteins,
                          include_detail = annotation_detail)
-  if (isTRUE(ann$available)) qc <- c(qc, ann$qc)
+  # ann$qc is present whenever a config was supplied, including when annotation
+  # was requested but produced nothing (the skip reason must reach qc.tsv).
+  if (!is.null(ann$qc)) qc <- c(qc, ann$qc)
   write_tsv(build_qc_table(qc), file.path(outdir, "qc.tsv"))
   run_manifest(outdir, "B", list(
     top_n = top_n, identity_cutoff = identity_cutoff,
@@ -311,7 +313,7 @@ run_mode_b <- function(reads_path, reference_path, outdir,
     min_ref_coverage = min_ref_coverage, max_msa_seqs = max_msa_seqs,
     consensus_method = consensus_method, aligner = aligner, threads = threads
   ), ref, qc, extra = c(list(reads_md5 = safe_md5(reads_path)),
-                        if (isTRUE(ann$available)) list(annotation = ann$manifest)))
+                        if (!is.null(ann$manifest)) list(annotation = ann$manifest)))
 
   if (!isTRUE(keep_intermediates) && !is.null(prep$bam)) {
     unlink(c(prep$bam, paste0(prep$bam, ".bai"), paste0(prep$bam, ".minimap2.log")))

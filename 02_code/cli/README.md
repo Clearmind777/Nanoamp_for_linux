@@ -40,7 +40,6 @@ nanoamp help
 | `--clear-cache` | flag | false | Clear the annotation reference cache and exit |
 | `--no-cache` | flag | false | Ignore cached reference slices and re-fetch them |
 | `--cache-dir` | path | `$XDG_CACHE_HOME/nanoamp/ref` | Cache location |
-| `--ensembl-release` | int | latest | Pin the Ensembl release used for annotation |
 
 ### Annotation notes
 
@@ -52,6 +51,11 @@ it never silently returns unannotated results. The `cds` route
 
 See the "Functional annotation" section of the root README for the consequence
 vocabulary and the self-checks that run on every annotation pass.
+
+The Ensembl release actually used is recorded in `run_manifest.json` as
+`annotation.ensembl_release`; quote that value when reporting or re-checking
+results. `--ensembl-release` does **not** exist in v0.1.0 — pinning a historical
+release needs the Ensembl archive hosts, so it is left for a later version.
 
 ## batch input
 

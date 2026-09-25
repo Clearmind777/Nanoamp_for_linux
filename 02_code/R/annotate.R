@@ -784,6 +784,9 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
     list(ok = TRUE, release = NA_character_)
   }
   if (needs_network && !quiet) log_info("annotation: Ensembl release ", chk$release)
+  # Where the structure/sequence came from. The offline route never touches
+  # Ensembl, so it must not be reported as if it did.
+  ann_source <- if (needs_network) "ensembl-rest" else "cds-config"
 
   ctx <- annotation_context(ref_seq, cfg)
   if (identical(cfg$route, "genome")) {
@@ -791,7 +794,9 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
   }
   if (isTRUE(list_only)) {
     annotation_print_candidates(ctx)
-    return(invisible(list(available = FALSE, candidates = ctx$candidates)))
+    return(invisible(list(requested = TRUE, available = FALSE, list_only = TRUE,
+                          table = NULL, qc = NULL, manifest = NULL,
+                          candidates = ctx$candidates)))
   }
 
   if (identical(cfg$route, "cds")) {
@@ -824,6 +829,7 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
   detail_rows <- list()
   qc_extra <- list()
   manifest_tr <- list()
+  skipped_tr <- list()
 
   for (ti in seq_len(nrow(tsel))) {
     tid <- tsel$transcript_id[ti]
@@ -834,6 +840,11 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
     }
     if (!isTRUE(structure$ok)) {
       if (!quiet) log_warn("annotation: ", tid, " skipped: ", structure$problem)
+      skipped_tr[[length(skipped_tr) + 1L]] <- list(
+        transcript_id = tid,
+        transcript_name = tsel$transcript_name[ti],
+        problem = structure$problem
+      )
       next
     }
     # V1: abort rather than emit consequences built on a wrong frame.
@@ -923,8 +934,46 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
   }
 
   if (length(rows) == 0) {
-    return(invisible(list(available = FALSE, table = NULL, qc = list(),
-                          candidates = ctx$candidates)))
+    reason <- if (length(skipped_tr) > 0L) {
+      paste(vapply(skipped_tr, function(x) {
+        sprintf("%s (%s)", x$transcript_id, x$problem)
+      }, character(1)), collapse = "; ")
+    } else {
+      "no transcript was selected for this amplicon"
+    }
+    if (!quiet) log_warn("annotation: nothing was annotated - ", reason)
+    # Annotation was explicitly requested, so the run must not *look*
+    # annotated. The exit code stays 0 (the sequence analysis itself is fine),
+    # but qc.tsv and run_manifest.json record that nothing was produced and why.
+    return(invisible(list(
+      requested = TRUE, available = FALSE, table = NULL,
+      candidates = ctx$candidates,
+      qc = list(
+        annotation_enabled = TRUE,
+        annotation_name = cfg$name,
+        annotation_route = cfg$route,
+        annotation_source = ann_source,
+        ensembl_release = chk$release,
+        genetic_code = cfg$genetic_code,
+        n_transcripts = nrow(tsel),
+        annotation_available = FALSE,
+        annotation_skip_reason = reason
+      ),
+      manifest = list(
+        enabled = TRUE,
+        available = FALSE,
+        source = ann_source,
+        ensembl_release = chk$release,
+        config_path = cfg$config_path %||% NA_character_,
+        config = cfg[c("name", "route", "genetic_code", "transcript_id",
+                       "transcript_all")],
+        genomic = if (is.null(ctx$genomic)) NULL else
+          ctx$genomic[c("chrom", "start", "end", "strand", "identity",
+                        "n_mismatch", "method")],
+        transcripts = manifest_tr,
+        skipped_transcripts = skipped_tr
+      )
+    )))
   }
   out <- data.table::rbindlist(rows, use.names = TRUE, fill = TRUE)
   # Per haplotype: the worst consequence across the selected transcripts.
@@ -943,10 +992,11 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
     annotation_enabled = TRUE,
     annotation_name = cfg$name,
     annotation_route = cfg$route,
-    annotation_source = "ensembl-rest",
+    annotation_source = ann_source,
     ensembl_release = chk$release,
     genetic_code = cfg$genetic_code,
     n_transcripts = nrow(tsel),
+    annotation_available = TRUE,
     n_haplotypes_annotated = uniqueN(out$haplotype_id[out$cds_ok == TRUE]),
     n_haplotypes_skipped = uniqueN(out$haplotype_id[is.na(out$cds_ok) | out$cds_ok == FALSE]),
     n_frameshift = sum(out$consequence_any_transcript == "frameshift", na.rm = TRUE),
@@ -969,10 +1019,10 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
     write_tsv(det, file.path(outdir, "variants_annotation.tsv"))
   }
   invisible(list(
-    available = TRUE, table = out, qc = qc_extra,
+    requested = TRUE, available = TRUE, table = out, qc = qc_extra,
     candidates = ctx$candidates,
     manifest = list(
-      enabled = TRUE, source = "ensembl-rest",
+      enabled = TRUE, available = TRUE, source = ann_source,
       ensembl_release = chk$release,
       config_path = cfg$config_path %||% NA_character_,
       config = cfg[c("name", "route", "genetic_code", "transcript_id", "transcript_all")],
@@ -1020,7 +1070,8 @@ annotation_pass <- function(config_path, ref, hap, variants, outdir,
                             quiet = FALSE, include_proteins = FALSE,
                             include_detail = FALSE) {
   if (is.null(config_path) || is.na(config_path) || !nzchar(config_path)) {
-    return(list(available = FALSE))
+    return(list(requested = FALSE, available = FALSE, table = NULL,
+                qc = NULL, manifest = NULL))
   }
   cfg <- annotation_config_read(config_path)
   cfg$config_path <- normalizePath(config_path, mustWork = FALSE)

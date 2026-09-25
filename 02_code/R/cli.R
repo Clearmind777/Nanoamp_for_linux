@@ -56,6 +56,8 @@ cli_call_options <- function() {
                           help = "Clear the annotation reference cache and exit"),
     optparse::make_option(c("--no-cache"), action = "store_true", default = FALSE,
                           help = "Ignore cached reference slices and re-fetch them"),
+    optparse::make_option(c("--cache-dir"), type = "character", default = NULL,
+                          help = "Annotation reference cache directory [default: XDG cache]"),
     optparse::make_option(c("--annotation-proteins"), action = "store_true", default = FALSE,
                           help = "Include reference and alternate protein sequences in annotation.tsv"),
     optparse::make_option(c("--annotation-detail"), action = "store_true", default = FALSE,
@@ -83,9 +85,21 @@ cli_batch_options <- function() {
     optparse::make_option(c("--list-transcripts"), action = "store_true", default = FALSE),
     optparse::make_option(c("--clear-cache"), action = "store_true", default = FALSE),
     optparse::make_option(c("--no-cache"), action = "store_true", default = FALSE),
+    optparse::make_option(c("--cache-dir"), type = "character", default = NULL),
     optparse::make_option(c("--annotation-proteins"), action = "store_true", default = FALSE),
     optparse::make_option(c("--annotation-detail"), action = "store_true", default = FALSE)
   )
+}
+
+# --cache-dir is the CLI counterpart of the NANOAMP_CACHE_DIR environment
+# variable that annotation_cache_dir() reads; set it before anything touches
+# the cache (the --clear-cache / --no-cache paths below included).
+cli_apply_cache_dir <- function(opt) {
+  d <- opt$`cache-dir`
+  if (!is.null(d) && length(d) == 1L && !is.na(d) && nzchar(d)) {
+    Sys.setenv(NANOAMP_CACHE_DIR = d)
+  }
+  invisible(TRUE)
 }
 
 cli_cmd_call <- function(args) {
@@ -96,6 +110,7 @@ cli_cmd_call <- function(args) {
     cli_usage()
     stop("call requires --reads, --reference and --outdir", call. = FALSE)
   }
+  cli_apply_cache_dir(opt)
   if (isTRUE(opt$`clear-cache`)) {
     d <- annotation_cache_clear()
     cat("Cleared annotation cache:", d, "\n")
@@ -131,6 +146,7 @@ cli_cmd_batch <- function(args) {
     cli_usage()
     stop("batch requires --sample-sheet and --outdir", call. = FALSE)
   }
+  cli_apply_cache_dir(opt)
   sheet <- data.table::fread(opt$`sample-sheet`, sep = "\t", header = TRUE)
   needed <- c("sample", "reads", "reference")
   if (!all(needed %in% names(sheet))) {

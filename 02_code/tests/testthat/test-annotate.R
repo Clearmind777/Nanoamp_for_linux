@@ -518,3 +518,78 @@ test_that("malformed operations are reported, not silently applied", {
     "spans past the end"
   )
 })
+
+# ---------------------------------------------------------------------------
+# Annotation requested but not produced must be visible in the outputs.
+#
+# The sequence analysis itself succeeded, so the run still exits 0; what must
+# not happen is a run that *looks* annotated while carrying no annotation.
+# ---------------------------------------------------------------------------
+
+skip_report_fixture <- function(td, ref_seq, cds_end) {
+  cfg_path <- file.path(td, "cfg.json")
+  writeLines(sprintf(
+    '{"name":"skip_probe","route":"cds","cds":{"start":1,"end":%d,"boundaries":"inclusive"}}',
+    cds_end
+  ), cfg_path)
+  cfg <- annotation_config_read(cfg_path)
+  cfg$config_path <- cfg_path
+  hap <- data.table::data.table(
+    haplotype_id = "H1", count = 2L, proportion = 1,
+    signature = "", variants = ".", sequence = ref_seq
+  )
+  list(cfg = cfg, hap = hap)
+}
+
+test_that("a skipped annotation is recorded in qc and the run manifest", {
+  td <- tempfile("ann_skip_"); dir.create(td)
+  ref_seq <- "ATGAAATTTTAA"          # 12 bp
+  fx <- skip_report_fixture(td, ref_seq, cds_end = 11L)   # 11 bp: not a multiple of 3
+
+  res <- run_annotation(ref_seq, fx$hap, NULL, td, fx$cfg, quiet = TRUE)
+
+  expect_true(isTRUE(res$requested))
+  expect_false(isTRUE(res$available))
+  expect_null(res$table)
+  # qc.tsv must explain why nothing was annotated
+  expect_true(isTRUE(res$qc$annotation_enabled))
+  expect_false(isTRUE(res$qc$annotation_available))
+  expect_match(res$qc$annotation_skip_reason, "not a multiple of 3")
+  # run_manifest.json must carry the same verdict plus the per-transcript reason
+  expect_false(isTRUE(res$manifest$available))
+  expect_true(length(res$manifest$skipped_transcripts) >= 1L)
+  expect_match(res$manifest$skipped_transcripts[[1]]$problem, "not a multiple of 3")
+  # no annotation table was written
+  expect_false(file.exists(file.path(td, "annotation.tsv")))
+})
+
+test_that("a usable CDS still annotates and reports the source it really used", {
+  td <- tempfile("ann_ok_"); dir.create(td)
+  ref_seq <- "ATGAAATTTTAA"          # 12 bp
+  fx <- skip_report_fixture(td, ref_seq, cds_end = 12L)
+
+  res <- run_annotation(ref_seq, fx$hap, NULL, td, fx$cfg, quiet = TRUE)
+
+  expect_true(isTRUE(res$available))
+  expect_true(isTRUE(res$qc$annotation_available))
+  # route "cds" never contacts Ensembl, so it must not claim to have
+  expect_equal(res$qc$annotation_source, "cds-config")
+  expect_equal(res$manifest$source, "cds-config")
+  expect_true(file.exists(file.path(td, "annotation.tsv")))
+})
+
+test_that("no annotation config means nothing is added to the outputs", {
+  res <- annotation_pass(NULL, list(sequence = "ACGT"), data.table::data.table(), NULL)
+  expect_false(isTRUE(res$requested))
+  expect_null(res$qc)
+  expect_null(res$manifest)
+})
+
+test_that("the shipped example_cds.json is a usable config", {
+  p <- testthat::test_path("..", "..", "configs", "example_cds.json")
+  skip_if_not(file.exists(p), "repository-level 02_code/configs/ is not available")
+  cfg <- annotation_config_read(p)
+  expect_equal(cfg$route, "cds")
+  # the bug this guards against: a shipped example whose CDS the tool rejects
+  expect_equal((cfg$cds$end - cfg$cds$start + 1L) %% 3L, 0L)
+})

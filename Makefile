@@ -14,7 +14,7 @@ help:
 	@echo "  make functional-test Run all datasets x modes (needs R deps + minimap2)"
 	@echo "  make clean-builds Remove 05_builds/r contents"
 	@echo "  make release      Build all release/ artifacts from the current tag/commit"
-	@echo "  make release-check Verify release/ checksums and metadata (no publishing)"
+	@echo "  make release-check Verify release/ checksums and metadata (needs artifacts from 'make release'; no publishing)"
 	@echo "  make release-publish Publish release/ to GitHub (needs gh auth or GH_TOKEN)"
 
 install:

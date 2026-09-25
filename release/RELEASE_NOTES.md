@@ -35,15 +35,17 @@
 
 对应 `programs_dev_plan_1.md` §1.1 第 6 项「连接 GTF 等注释信息，判断变异属于移码、提前终止、missense 等」。
 
-- **两条路线**
-  - `--annotation-route genome`（默认）：仅联网拉取 Ensembl REST 注释与序列，**不要求用户自备 GTF / FASTA**。
-  - `--annotation-route cds`：完全离线的降级路线，只需给出 CDS 区间，不联网。
+- **两条路线**（由配置文件的 `route` 字段选择，没有对应的命令行开关）
+  - `"route": "genome"`（默认）：仅联网拉取 Ensembl REST 注释与序列，**不要求用户自备 GTF / FASTA**。
+  - `"route": "cds"`：完全离线的降级路线，只需在配置里给出 CDS 区间，不联网。
 - **只使用 Ensembl/GENCODE 体系**做结构注释；UCSC 仅用于取序列。刻意**不使用** UCSC 的
   `knownGene` / `ncbiRefSeq*` 轨道，避免 `uc*`/`NM_` 两套 ID 与 GENCODE 混用造成坐标错配。
 - **不再接受本地 GTF/FASTA**：避免用户手里的注释版本与参考基因组不匹配而产出看似合理的错误结论。
 - **缓存**：`$XDG_CACHE_HOME/nanoamp/ref`（可用 `NANOAMP_CACHE_DIR` 或 `--cache-dir` 覆盖），
   `--clear-cache` 清空，`--no-cache` 绕过缓存。
-- **--ensembl-release** 默认取最新；**要复现结果必须显式固定 release**（本版验证使用 **116**）。
+- **release 记录**：所用 Ensembl release 写入 `run_manifest.json` 的
+  `annotation.ensembl_release`（本版验证使用 **116**），复核时以该字段为准。
+  本版**没有** `--ensembl-release` 参数，钉死历史 release 留待后续版本。
 
 ### 输出（在原有输出之外新增）
 
@@ -103,9 +105,10 @@
 ## 6. 已知限制（请先读这一节）
 
 - **`genome` 路线需要网络**。没有网络时会给出明确错误并非零退出，**不会**退化成静默的假结果。
-  需要离线时请使用 `--annotation-route cds`。
+  需要离线时请把配置里的 `route` 改成 `cds`（示例见 `02_code/configs/example_cds.json`）。
 - **注释结果依赖 Ensembl release**。默认取最新，不同时间运行可能得到不同注释。
-  发表或复核请始终显式写 `--ensembl-release <N>`。
+  发表或复核请记录 `run_manifest.json` 里的 `annotation.ensembl_release`
+  （本版验证使用 116）；本版尚未提供 `--ensembl-release` 来钉死版本。
 - **`all` 模式较慢**：受 Ensembl 节流限制（1.1 s/请求）。建议先用 `--list-transcripts` 选定转录本。
 - **`protein_change` 为 HGVS 风格，但未经 HGVS 认证**，不应当作临床报告依据。
 - **UTR 分类精度有限**：`overlap/id?feature=exon` 返回的是位点范围的外显子，
@@ -164,17 +167,21 @@ R CMD INSTALL nanoamp-0.1.0-R-package.tar.gz    # 或 R CMD INSTALL 02_code
 Rscript 02_code/scripts/run_functional_tests.R   # 期望 168/168 ok
 
 # 5) 分析一个扩增子（模式 A）
-Rscript 02_code/scripts/run_analysis.R --help
+sh 02_code/cli/nanoamp call \
+  --reads <reads.fastq> --reference <参考.fasta> --mode A --outdir <out>
 
-# 6) 在线功能注释（先看有哪些转录本）
-Rscript 02_code/scripts/run_analysis.R \
-  --mode A --ref <参考.fasta> --reads <reads.fastq> \
-  --annotate --annotation-route genome --list-transcripts
+# 6) 在线功能注释（先看这个扩增子落在哪些转录本上）
+sh 02_code/cli/nanoamp call \
+  --reads <reads.fastq> --reference <参考.fasta> --outdir <out> \
+  --list-transcripts
+sh 02_code/cli/nanoamp call \
+  --reads <reads.fastq> --reference <参考.fasta> --outdir <out> \
+  --annotate-config 02_code/configs/example_online.json
 
-# 7) 离线功能注释（降级路线）
-Rscript 02_code/scripts/run_analysis.R \
-  --mode A --ref <参考.fasta> --reads <reads.fastq> \
-  --annotate --annotation-route cds --annotate-config 02_code/configs/example_cds.json
+# 7) 离线功能注释（降级路线；坐标必须换成你自己扩增子的 CDS）
+sh 02_code/cli/nanoamp call \
+  --reads <reads.fastq> --reference <参考.fasta> --outdir <out> \
+  --annotate-config 02_code/configs/example_cds.json
 ```
 
 ## 9. 引用与出处

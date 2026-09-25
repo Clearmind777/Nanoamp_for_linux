@@ -125,17 +125,29 @@ cds_boundary_disrupted  cds_ambiguous_base  no_variant
 
 ```text
 annotation_enabled  annotation_name  annotation_route  annotation_source
-ensembl_release  genetic_code  n_transcripts
+ensembl_release  genetic_code  n_transcripts  annotation_available
 n_haplotypes_annotated  n_haplotypes_skipped
 n_frameshift  n_stop_gained  n_stop_lost  n_start_lost
 n_missense  n_synonymous  n_inframe  n_transcript_conflicts
+annotation_skip_reason                     # 仅当 annotation_available = FALSE
 ```
+
+`annotation_source` 是结构/序列的真正来源：`ensembl-rest`（`genome` 路线）或
+`cds-config`（`cds` 路线，全程离线，不访问 Ensembl）。
+
+**注释被请求但没产出时**（例如配置里的 CDS 长度不是 3 的倍数，或 `genome` 路线没有
+选中任何转录本），进程仍以退出码 0 结束——序列分析本身是成功的——但会在
+`qc.tsv` 写入 `annotation_available = FALSE` 与 `annotation_skip_reason`，并在
+`run_manifest.json` 写入 `annotation.available = false` 与
+`annotation.skipped_transcripts`。**判断"这次到底有没有注释"请以这两个字段为准，
+不要只看 `annotation.tsv` 是否存在。**
 
 ### run_manifest.json 的 annotation 段
 
 ```json
 "annotation": {
   "enabled": true,
+  "available": true,
   "source": "ensembl-rest",
   "ensembl_release": "116",
   "config_path": "...", "config": { },
@@ -143,6 +155,25 @@ n_missense  n_synonymous  n_inframe  n_transcript_conflicts
                 "identity": 1.0, "n_mismatch": 0, "method": "exact_match" },
   "transcripts": [ { "transcript_id": "ENST...", "cds_length": 0,
                      "protein_length": 0, "protein_verified": true } ]
+}
+```
+
+没有任何转录本可用时（`available: false`）：
+
+```json
+"annotation": {
+  "enabled": true,
+  "available": false,
+  "source": "cds-config",
+  "ensembl_release": null,
+  "config_path": "...", "config": { },
+  "genomic": null,
+  "transcripts": [],
+  "skipped_transcripts": [
+    { "transcript_id": "amplicon_cds_55_320",
+      "transcript_name": "example",
+      "problem": "CDS length 266 is not a multiple of 3 (drop 2 bp or fix the frame)" }
+  ]
 }
 ```
 

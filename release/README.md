@@ -68,8 +68,19 @@ tarball 打包进新版，归档体积逐版膨胀。
 
 ```bash
 ./release/publish_github_release.sh               # 需要 gh auth login 或 GH_TOKEN
-DRY_RUN=1 ./release/publish_github_release.sh     # 只校验，不发布
+DRY_RUN=1 ./release/publish_github_release.sh     # 只校验，不发布（make release-check）
 ```
+
+注意：上面两条都会校验 `SHA256SUMS` 列出的归档文件，而这些大产物**不在 git 里**，
+所以在一份刚克隆下来的仓库里必须先构建：
+
+```bash
+make release          # 或 bash 02_code/scripts/mk-release.sh --ref <tag|commit>
+make release-check    # 构建完再校验
+```
+
+缺少产物时脚本会直接列出缺哪几个文件并提示先构建，而不是抛一堆 `sha256sum` 的
+“No such file or directory”。
 
 前置条件：`git push origin v0.1.0`（Release 必须有对应的远端 tag）。
 脚本幂等：Release 已存在时只覆盖同名附件。
