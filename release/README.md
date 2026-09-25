@@ -69,6 +69,9 @@ tarball 打包进新版，归档体积逐版膨胀。
 ```bash
 ./release/publish_github_release.sh               # 需要 gh auth login 或 GH_TOKEN
 DRY_RUN=1 ./release/publish_github_release.sh     # 只校验，不发布（make release-check）
+
+# 只刷新已发布 Release 的正文与 RELEASE_NOTES.md 附件（不碰归档、不校验和）
+NOTES_ONLY=1 ./release/publish_github_release.sh
 ```
 
 注意：上面两条都会校验 `SHA256SUMS` 列出的归档文件，而这些大产物**不在 git 里**，
@@ -82,8 +85,13 @@ make release-check    # 构建完再校验
 缺少产物时脚本会直接列出缺哪几个文件并提示先构建，而不是抛一堆 `sha256sum` 的
 “No such file or directory”。
 
+**修正说明文字用 `NOTES_ONLY=1`**：归档不入 git，改一句发布说明不该被迫重建归档
+（重建会改变字节与校验和，那相当于重发一个版本）。`NOTES_ONLY=1` 只更新 Release
+正文和 `RELEASE_NOTES.md` 附件，`SHA256SUMS` 与归档原样不动。
+
 前置条件：`git push origin v0.1.0`（Release 必须有对应的远端 tag）。
-脚本幂等：Release 已存在时只覆盖同名附件。
+脚本幂等：Release 已存在时覆盖同名附件，**并用 `RELEASE_NOTES.md` 重写 Release 正文**
+——正文与该附件是同一份文档，仓库里改了而页面上没改，下载到的仍是已经修正掉的旧说明。
 
 ## 新增下一个版本
 

@@ -133,10 +133,12 @@ sh 02_code/cli/nanoamp call ... --annotate-config cfg.json \
 | `qc.tsv` | 追加注释统计（转录本数、各类后果计数、冲突数） |
 | `run_manifest.json` | 追加 `annotation` 段（来源、Ensembl release、配置、转录本校验结果） |
 
-请求了注释却没能产出时（例如配置里的 CDS 长度不是 3 的倍数），运行仍以退出码 0
-结束，但 `qc.tsv` 会写 `annotation_available = FALSE` 与 `annotation_skip_reason`，
-`run_manifest.json` 会写 `annotation.available = false` 与 `annotation.skipped_transcripts`。
-**判断有没有注释请以这两个字段为准，不要只看 `annotation.tsv` 在不在。**
+只要有转录本被跳过就会留痕（控制台的 WARN 在运行结束后无法追溯）：`qc.tsv` 写
+`n_transcripts_annotated` / `n_transcripts_skipped` 与 `annotation_skip_reason`，
+`run_manifest.json` 写 `annotation.skipped_transcripts`，逐条给出转录本与原因。
+全部失败时（例如 CDS 长度不是 3 的倍数）额外写 `annotation_available = FALSE` /
+`annotation.available = false`；两种情况的退出码都是 0，因为序列分析本身是成功的。
+**判断注释覆盖了哪些转录本请看这些字段，不要只看 `annotation.tsv` 里出现了几条。**
 
 ### 参考信息从哪来
 

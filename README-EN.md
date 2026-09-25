@@ -146,12 +146,15 @@ Annotation outputs:
 | `qc.tsv` | extra annotation metrics (transcript count, consequence counts, conflicts) |
 | `run_manifest.json` | an `annotation` block (source, Ensembl release, config, transcript checks) |
 
-When annotation is requested but cannot be produced (for example a CDS in the
-config whose length is not a multiple of 3), the run still exits 0, but `qc.tsv`
-gets `annotation_available = FALSE` plus `annotation_skip_reason`, and
-`run_manifest.json` gets `annotation.available = false` plus
-`annotation.skipped_transcripts`. **Use those fields to tell whether a run was
-annotated; the presence of `annotation.tsv` alone is not enough.**
+Whenever a transcript is skipped it is recorded - the console WARN cannot be
+traced afterwards. `qc.tsv` gets `n_transcripts_annotated` /
+`n_transcripts_skipped` and `annotation_skip_reason`; `run_manifest.json` gets
+`annotation.skipped_transcripts` with the transcript and the reason. When every
+transcript fails (for example a CDS whose length is not a multiple of 3) the
+outputs additionally carry `annotation_available = FALSE` /
+`annotation.available = false`. Both cases exit 0, because the sequence
+analysis itself succeeded. **Check those fields to see which transcripts were
+annotated; the rows in `annotation.tsv` alone do not tell you.**
 
 ### Where the reference comes from
 

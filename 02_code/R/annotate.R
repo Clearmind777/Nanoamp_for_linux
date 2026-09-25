@@ -933,13 +933,21 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
     }
   }
 
+  # One reason string serves both outcomes: with a partial success it says
+  # which transcripts were dropped, with a total failure it explains the run.
+  skip_reason <- if (length(skipped_tr) > 0L) {
+    paste(vapply(skipped_tr, function(x) {
+      sprintf("%s (%s)", x$transcript_id, x$problem)
+    }, character(1)), collapse = "; ")
+  } else {
+    NA_character_
+  }
+
   if (length(rows) == 0) {
-    reason <- if (length(skipped_tr) > 0L) {
-      paste(vapply(skipped_tr, function(x) {
-        sprintf("%s (%s)", x$transcript_id, x$problem)
-      }, character(1)), collapse = "; ")
-    } else {
+    reason <- if (is.na(skip_reason)) {
       "no transcript was selected for this amplicon"
+    } else {
+      skip_reason
     }
     if (!quiet) log_warn("annotation: nothing was annotated - ", reason)
     # Annotation was explicitly requested, so the run must not *look*
@@ -956,6 +964,8 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
         ensembl_release = chk$release,
         genetic_code = cfg$genetic_code,
         n_transcripts = nrow(tsel),
+        n_transcripts_annotated = 0L,
+        n_transcripts_skipped = length(skipped_tr),
         annotation_available = FALSE,
         annotation_skip_reason = reason
       ),
@@ -996,6 +1006,8 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
     ensembl_release = chk$release,
     genetic_code = cfg$genetic_code,
     n_transcripts = nrow(tsel),
+    n_transcripts_annotated = length(manifest_tr),
+    n_transcripts_skipped = length(skipped_tr),
     annotation_available = TRUE,
     n_haplotypes_annotated = uniqueN(out$haplotype_id[out$cds_ok == TRUE]),
     n_haplotypes_skipped = uniqueN(out$haplotype_id[is.na(out$cds_ok) | out$cds_ok == FALSE]),
@@ -1009,6 +1021,9 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
                       c("inframe_insertion", "inframe_deletion"), na.rm = TRUE),
     n_transcript_conflicts = uniqueN(out$haplotype_id[out$transcript_conflict == TRUE])
   )
+  # Only present when something was actually dropped, so a clean run does not
+  # carry an empty annotation_skip_reason row in qc.tsv.
+  if (length(skipped_tr) > 0L) qc_extra$annotation_skip_reason <- skip_reason
   write_tsv(out, file.path(outdir, "annotation.tsv"))
   if (isTRUE(include_detail) && length(detail_rows) > 0) {
     det <- data.table::rbindlist(detail_rows, use.names = TRUE, fill = TRUE)
@@ -1027,7 +1042,10 @@ run_annotation <- function(ref_seq, hap, variants, outdir, cfg,
       config_path = cfg$config_path %||% NA_character_,
       config = cfg[c("name", "route", "genetic_code", "transcript_id", "transcript_all")],
       genomic = if (is.null(ctx$genomic)) NULL else ctx$genomic[c("chrom", "start", "end", "strand", "identity", "n_mismatch", "method")],
-      transcripts = manifest_tr
+      transcripts = manifest_tr,
+      # Present in both outcomes: a run that annotated 7 of 8 transcripts must
+      # not look as if the locus only had 7.
+      skipped_transcripts = skipped_tr
     )
   ))
 }

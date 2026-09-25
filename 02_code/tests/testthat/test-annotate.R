@@ -575,6 +575,11 @@ test_that("a usable CDS still annotates and reports the source it really used", 
   # route "cds" never contacts Ensembl, so it must not claim to have
   expect_equal(res$qc$annotation_source, "cds-config")
   expect_equal(res$manifest$source, "cds-config")
+  # nothing was skipped: no reason row, and the key is still present as empty
+  expect_null(res$qc$annotation_skip_reason)
+  expect_equal(res$qc$n_transcripts_skipped, 0L)
+  expect_equal(res$qc$n_transcripts_annotated, 1L)
+  expect_equal(length(res$manifest$skipped_transcripts), 0L)
   expect_true(file.exists(file.path(td, "annotation.tsv")))
 })
 
@@ -592,4 +597,66 @@ test_that("the shipped example_cds.json is a usable config", {
   expect_equal(cfg$route, "cds")
   # the bug this guards against: a shipped example whose CDS the tool rejects
   expect_equal((cfg$cds$end - cfg$cds$start + 1L) %% 3L, 0L)
+})
+
+# ---------------------------------------------------------------------------
+# Partial success: some transcripts annotated, some skipped.
+#
+# A run that annotates 7 of 8 overlapping transcripts must not look as if the
+# locus only had 7. The genome route is mocked here so this stays offline.
+# ---------------------------------------------------------------------------
+
+test_that("a partially successful annotation still reports the skipped transcripts", {
+  td <- tempfile("ann_partial_"); dir.create(td)
+  ref_seq <- "ATGAAATTTTAA"          # 12 bp, 4 codons
+  cfg_path <- file.path(td, "cfg.json")
+  writeLines('{"name":"partial","route":"genome","transcript_all":true}', cfg_path)
+  cfg <- annotation_config_read(cfg_path)
+  cfg$config_path <- cfg_path
+
+  good <- fake_structure(ref_seq)
+  bad <- list(transcript_id = "ENST_BAD", ok = FALSE,
+              problem = "could not fetch the authoritative CDS sequence")
+
+  testthat::local_mocked_bindings(
+    annotation_require_provider = function(...) list(ok = TRUE, release = "116"),
+    annotation_locate_amplicon = function(ref_seq, ...) list(
+      chrom = "19", start = 1000L, end = 1011L, strand = "+", identity = 1,
+      n_mismatch = 0L, method = "test", anchor_coverage = 1, anchor_len = 12L
+    ),
+    annotation_candidates = function(ctx, with_cds_overlap = FALSE) {
+      data.table::data.table(
+        transcript_id = c("ENST_GOOD", "ENST_BAD"),
+        transcript_name = c("good", "bad"),
+        gene_id = NA_character_, biotype = "protein_coding",
+        chrom = "19", start = 1000L, end = 1011L, strand = 1L,
+        assembly = "GRCh38", is_canonical = c(TRUE, FALSE),
+        is_mane = c(FALSE, FALSE), tags = NA_character_, tsl = NA_character_,
+        ccds = NA_character_, cds_overlap_bp = c(12L, 12L)
+      )
+    },
+    annotation_transcript_structure = function(tid) {
+      if (identical(tid, "ENST_GOOD")) good else bad
+    },
+    annotation_verify_reference_protein = function(...) {
+      list(ok = TRUE, length_aa = 4L, protein = NA_character_, verified = TRUE)
+    },
+    .package = "nanoamp"
+  )
+
+  hap <- data.table::data.table(
+    haplotype_id = "H1", count = 2L, proportion = 1,
+    signature = "", variants = ".", sequence = ref_seq
+  )
+  res <- run_annotation(ref_seq, hap, NULL, td, cfg, quiet = TRUE)
+
+  expect_true(isTRUE(res$available))
+  expect_equal(length(res$manifest$transcripts), 1L)
+  expect_equal(length(res$manifest$skipped_transcripts), 1L)
+  expect_equal(res$manifest$skipped_transcripts[[1]]$transcript_id, "ENST_BAD")
+  expect_match(res$manifest$skipped_transcripts[[1]]$problem, "authoritative CDS")
+  expect_equal(res$qc$n_transcripts, 2L)
+  expect_equal(res$qc$n_transcripts_annotated, 1L)
+  expect_equal(res$qc$n_transcripts_skipped, 1L)
+  expect_match(res$qc$annotation_skip_reason, "ENST_BAD")
 })

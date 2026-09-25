@@ -50,38 +50,48 @@ fi
 info "仓库: $REPO    tag: $TAG    release: $VERSION"
 
 # --- 2. 校验产物 -----------------------------------------------------------
-[[ -f release/SHA256SUMS ]] || die "缺少 release/SHA256SUMS"
-
-# SHA256SUMS 列出的归档文件不入 git，必须先在本地构建，否则下面的 sha256sum -c
-# 只会打印一串 "No such file or directory"。这里先给出可执行的提示。
-missing="$(awk 'NF>=2 {print $2}' release/SHA256SUMS | sed 's/^\*//' | while read -r f; do
-  [[ -f "release/$f" ]] || echo "$f"
-done)"
-if [[ -n "$missing" ]]; then
-  printf 'ERROR: 以下发布产物不存在:\n' >&2
-  while read -r f; do printf '  - release/%s\n' "$f" >&2; done <<< "$missing"
-  printf '发布归档不入 git（见 release/README.md），需要先在本地构建:\n' >&2
-  printf '  make release        # 等价于 bash 02_code/scripts/mk-release.sh --ref %s\n' "$TAG" >&2
-  exit 1
-fi
-
-info "校验产物校验和"
-if command -v sha256sum >/dev/null 2>&1; then
-  (cd release && sha256sum -c SHA256SUMS)
-else
-  (cd release && shasum -a 256 -c SHA256SUMS)
-fi
-
-ASSETS=()
-while IFS= read -r f; do
-  [[ -f "release/$f" ]] || die "SHA256SUMS 中列出的文件不存在: release/$f"
-  ASSETS+=("release/$f")
-done < <(awk '{print $2}' release/SHA256SUMS | sed 's/^\*//')
-ASSETS+=("release/SHA256SUMS" "release/manifest.tsv" "release/RELEASE_NOTES.md")
-info "附件数量: ${#ASSETS[@]}"
-
+# NOTES_ONLY=1 只刷新 Release 正文与 RELEASE_NOTES.md 附件。归档不入 git，修正
+# 说明文字时不该被迫重建归档——重建会改变校验和，那等于重发一个版本。
+NOTES_ONLY="${NOTES_ONLY:-0}"
 NOTES_FILE="${NOTES_FILE:-release/RELEASE_NOTES.md}"
 [[ -f "$NOTES_FILE" ]] || die "缺少发布说明 $NOTES_FILE"
+
+ASSETS=()
+if [[ "$NOTES_ONLY" == "1" ]]; then
+  info "NOTES_ONLY=1: 只更新 Release 正文与 $(basename "$NOTES_FILE")"
+  ASSETS+=("release/RELEASE_NOTES.md")
+else
+  [[ -f release/SHA256SUMS ]] || die "缺少 release/SHA256SUMS"
+
+  # SHA256SUMS 列出的归档文件不入 git，必须先在本地构建，否则下面的 sha256sum -c
+  # 只会打印一串 "No such file or directory"。这里先给出可执行的提示。
+  missing="$(awk 'NF>=2 {print $2}' release/SHA256SUMS | sed 's/^\*//' | while read -r f; do
+    [[ -f "release/$f" ]] || echo "$f"
+  done)"
+  if [[ -n "$missing" ]]; then
+    printf 'ERROR: 以下发布产物不存在:\n' >&2
+    while read -r f; do printf '  - release/%s\n' "$f" >&2; done <<< "$missing"
+    printf '发布归档不入 git（见 release/README.md），需要先在本地构建:\n' >&2
+    printf '  make release        # 等价于 bash 02_code/scripts/mk-release.sh --ref %s\n' "$TAG" >&2
+    printf '若只是想刷新发布说明（不动归档），用:\n' >&2
+    printf '  NOTES_ONLY=1 ./release/publish_github_release.sh\n' >&2
+    exit 1
+  fi
+
+  info "校验产物校验和"
+  if command -v sha256sum >/dev/null 2>&1; then
+    (cd release && sha256sum -c SHA256SUMS)
+  else
+    (cd release && shasum -a 256 -c SHA256SUMS)
+  fi
+
+  while IFS= read -r f; do
+    [[ -f "release/$f" ]] || die "SHA256SUMS 中列出的文件不存在: release/$f"
+    ASSETS+=("release/$f")
+  done < <(awk '{print $2}' release/SHA256SUMS | sed 's/^\*//')
+  ASSETS+=("release/SHA256SUMS" "release/manifest.tsv" "release/RELEASE_NOTES.md")
+fi
+info "附件数量: ${#ASSETS[@]}"
 
 # --- 3. 确认远端已有该 tag --------------------------------------------------
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
@@ -136,6 +146,10 @@ if [[ -z "$TOKEN" ]] && gh_ready; then
   if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
     info "Release $TAG 已存在，改为上传/覆盖附件"
     gh release upload "$TAG" "${ASSETS[@]}" --repo "$REPO" --clobber
+    # 正文与 release/RELEASE_NOTES.md 是同一份文档，附件更新了正文也必须跟上，
+    # 否则页面上仍是旧的（错误的）用法说明。
+    info "同步 Release 正文"
+    gh release edit "$TAG" --repo "$REPO" --notes-file "$NOTES_FILE"
   else
     gh release create "$TAG" "${ASSETS[@]}" \
       --repo "$REPO" \
@@ -196,7 +210,15 @@ PY
   release_id="$(printf '%s' "$resp" | sed -n 's/.*"id": *\([0-9]\{1,\}\).*/\1/p' | head -1)"
   [[ -n "$release_id" ]] || die "创建 Release 失败: $resp"
 else
-  info "Release $TAG 已存在 (id=$release_id)，继续上传附件"
+  info "Release $TAG 已存在 (id=$release_id)，更新正文并覆盖附件"
+  # 理由同 gh 分支：正文与 RELEASE_NOTES.md 必须一致。
+  body_payload="$(NOTES="$NOTES_FILE" python3 - <<'PY'
+import json, os
+print(json.dumps({"body": open(os.environ["NOTES"], encoding="utf-8").read()}))
+PY
+)"
+  curl -sS -X PATCH "${auth[@]}" "$API/releases/$release_id" \
+    -d "$body_payload" >/dev/null
 fi
 
 upload_base="https://uploads.github.com/repos/$REPO/releases/$release_id/assets"

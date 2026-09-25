@@ -60,8 +60,12 @@ WARN  annotation: amplicon_cds_55_320 skipped: CDS length 266 is not a multiple 
 
 这种情况下运行仍然以退出码 0 结束（序列分析本身是成功的），但 `qc.tsv` 会写入
 `annotation_available = FALSE` 和 `annotation_skip_reason`，`run_manifest.json` 的
-`annotation` 段会写入 `available: false`、`skipped_transcripts`。**只看有没有
-`annotation.tsv` 是不够的，请以这两个文件为准。**
+`annotation` 段会写入 `available: false`、`skipped_transcripts`。
+
+如果只是**部分**转录本被跳过（`--transcript all` 时常见：某个转录本没有权威 CDS），
+`available` 仍是 `true`，但 `annotation_skip_reason`、`skipped_transcripts` 以及
+`qc.tsv` 的 `n_transcripts_annotated` / `n_transcripts_skipped` 同样会记录被跳过的是
+哪一个、为什么。**只看 `annotation.tsv` 里出现了几条是不够的，请以这些字段为准。**
 
 **2. `cds` 坐标只对得上你给的那条参考序列。** 传给 `--reference` 的 FASTQ/FASTA
 必须是坐标所基于的那条扩增子；换参考就要重新给坐标。

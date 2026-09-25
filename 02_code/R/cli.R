@@ -102,9 +102,75 @@ cli_apply_cache_dir <- function(opt) {
   invisible(TRUE)
 }
 
+# ---------------------------------------------------------------------------
+# Long-flag validation
+#
+# optparse (via getopt) accepts unambiguous abbreviations, so `--annotate`
+# silently binds to `--annotate-config` and `--ref` to `--ref-label`. That is
+# how the old RELEASE_NOTES examples produced "Annotation config not found:
+# genome" instead of an unknown-option error. Abbreviations are rejected up
+# front and the real flag is suggested.
+# ---------------------------------------------------------------------------
+
+cli_long_flags <- function(options) {
+  out <- tryCatch(
+    vapply(options, function(o) {
+      # optparse changed its slot names between generations; accept both.
+      for (nm in c("long_name", "long_flag")) {
+        if (nm %in% methods::slotNames(o)) {
+          v <- methods::slot(o, nm)
+          if (length(v) == 1L && !is.na(v) && nzchar(v)) return(as.character(v))
+        }
+      }
+      NA_character_
+    }, character(1), USE.NAMES = FALSE),
+    error = function(e) character(0)
+  )
+  sort(unique(out[!is.na(out) & nzchar(out)]))
+}
+
+cli_legacy_flag_hint <- function(name) {
+  switch(
+    name,
+    "--annotate" = paste0(
+      " Functional annotation is enabled with --annotate-config <config.json>;\n",
+      "  the route comes from the config file's \"route\" field."),
+    "--annotation-route" = paste0(
+      " There is no --annotation-route: put \"route\": \"genome\" or \"cds\"\n",
+      "  inside the config file."),
+    "--ensembl-release" = paste0(
+      " Not implemented in v0.1.0: read annotation.ensembl_release from\n",
+      "  run_manifest.json instead."),
+    "--ref" = paste0(
+      " Use --reference <fasta> for the input, or --ref-label <label> for the\n",
+      "  label written to the outputs."),
+    ""
+  )
+}
+
+cli_check_flags <- function(args, options) {
+  known <- cli_long_flags(options)
+  if (length(known) == 0L) return(invisible(TRUE))  # introspection unavailable
+  for (a in args) {
+    if (!grepl("^--", a)) next
+    name <- sub("=.*$", "", a)
+    if (name %in% known || identical(name, "--help")) next
+    near <- known[startsWith(known, name)]
+    if (length(near) > 0L) {
+      stop(sprintf(
+        "Unknown option '%s'.%s\nClosest implemented option(s): %s\nAbbreviations are not accepted.",
+        name, cli_legacy_flag_hint(name), paste(near, collapse = ", ")
+      ), call. = FALSE)
+    }
+  }
+  invisible(TRUE)
+}
+
 cli_cmd_call <- function(args) {
+  options <- cli_call_options()
+  cli_check_flags(args, options)
   opt <- optparse::parse_args(
-    optparse::OptionParser(option_list = cli_call_options()), args = args
+    optparse::OptionParser(option_list = options), args = args
   )
   if (is.null(opt$reads) || is.null(opt$reference) || is.null(opt$outdir)) {
     cli_usage()
@@ -139,8 +205,10 @@ cli_cmd_call <- function(args) {
 }
 
 cli_cmd_batch <- function(args) {
+  options <- cli_batch_options()
+  cli_check_flags(args, options)
   opt <- optparse::parse_args(
-    optparse::OptionParser(option_list = cli_batch_options()), args = args
+    optparse::OptionParser(option_list = options), args = args
   )
   if (is.null(opt$`sample-sheet`) || is.null(opt$outdir)) {
     cli_usage()

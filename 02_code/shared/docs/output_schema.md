@@ -126,21 +126,33 @@ cds_boundary_disrupted  cds_ambiguous_base  no_variant
 ```text
 annotation_enabled  annotation_name  annotation_route  annotation_source
 ensembl_release  genetic_code  n_transcripts  annotation_available
+n_transcripts_annotated  n_transcripts_skipped
 n_haplotypes_annotated  n_haplotypes_skipped
 n_frameshift  n_stop_gained  n_stop_lost  n_start_lost
 n_missense  n_synonymous  n_inframe  n_transcript_conflicts
-annotation_skip_reason                     # 仅当 annotation_available = FALSE
+annotation_skip_reason                     # 仅当 n_transcripts_skipped > 0
 ```
 
 `annotation_source` 是结构/序列的真正来源：`ensembl-rest`（`genome` 路线）或
 `cds-config`（`cds` 路线，全程离线，不访问 Ensembl）。
 
-**注释被请求但没产出时**（例如配置里的 CDS 长度不是 3 的倍数，或 `genome` 路线没有
-选中任何转录本），进程仍以退出码 0 结束——序列分析本身是成功的——但会在
-`qc.tsv` 写入 `annotation_available = FALSE` 与 `annotation_skip_reason`，并在
-`run_manifest.json` 写入 `annotation.available = false` 与
-`annotation.skipped_transcripts`。**判断"这次到底有没有注释"请以这两个字段为准，
-不要只看 `annotation.tsv` 是否存在。**
+`n_transcripts` 是选中的转录本数，`n_transcripts_annotated` /
+`n_transcripts_skipped` 是其中成功与失败的条数（两者之和等于 `n_transcripts`）。
+
+**只要有转录本被跳过——无论是"部分成功"还是"全部失败"——都会被记录**，因为控制台的
+WARN 在运行结束后无法追溯：
+
+- `qc.tsv`：`n_transcripts_skipped > 0` 时写 `annotation_skip_reason`
+  （形如 `ENST00000591325 (could not fetch the authoritative CDS sequence)`）；
+- `run_manifest.json`：`annotation.skipped_transcripts` 始终存在，逐条给出
+  `transcript_id` / `transcript_name` / `problem`。
+
+全部失败时（例如配置里的 CDS 长度不是 3 的倍数，或 `genome` 路线没有选中任何转录本）
+还额外写 `annotation_available = FALSE` 与 `annotation.available = false`；进程仍以
+退出码 0 结束，因为序列分析本身是成功的。
+
+**判断"这次到底注释了哪些转录本"请看 `n_transcripts_skipped` 与
+`skipped_transcripts`，不要只看 `annotation.tsv` 里出现了几个转录本。**
 
 ### run_manifest.json 的 annotation 段
 
@@ -154,7 +166,9 @@ annotation_skip_reason                     # 仅当 annotation_available = FALSE
   "genomic": { "chrom": "19", "start": 0, "end": 0, "strand": "+",
                 "identity": 1.0, "n_mismatch": 0, "method": "exact_match" },
   "transcripts": [ { "transcript_id": "ENST...", "cds_length": 0,
-                     "protein_length": 0, "protein_verified": true } ]
+                     "protein_length": 0, "protein_verified": true } ],
+  "skipped_transcripts": [ { "transcript_id": "ENST...", "transcript_name": "...",
+                             "problem": "could not fetch the authoritative CDS sequence" } ]
 }
 ```
 
