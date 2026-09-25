@@ -156,12 +156,21 @@ cli_check_flags <- function(args, options) {
     name <- sub("=.*$", "", a)
     if (name %in% known || identical(name, "--help")) next
     near <- known[startsWith(known, name)]
+    hint <- cli_legacy_flag_hint(name)
+    # A flag worth explaining even though it is not a prefix of any real option
+    # (--annotation-route, --ensembl-release) must be caught here too: the
+    # message below is the only place that explains what to use instead.
+    if (length(near) == 0L && !nzchar(hint)) next
     if (length(near) > 0L) {
       stop(sprintf(
         "Unknown option '%s'.%s\nClosest implemented option(s): %s\nAbbreviations are not accepted.",
-        name, cli_legacy_flag_hint(name), paste(near, collapse = ", ")
+        name, hint, paste(near, collapse = ", ")
       ), call. = FALSE)
     }
+    stop(sprintf(
+      "Unknown option '%s'.%s\nSee --help for the implemented options.",
+      name, hint
+    ), call. = FALSE)
   }
   invisible(TRUE)
 }
@@ -251,8 +260,9 @@ cli_cmd_batch <- function(args) {
   }
   out <- data.table::rbindlist(summary_rows, use.names = TRUE)
   dir.create(opt$outdir, recursive = TRUE, showWarnings = FALSE)
-  data.table::fwrite(out, file.path(opt$outdir, "batch_summary.tsv"),
-                     sep = "\t", na = "")
+  # write_tsv() (not fwrite directly): `error` holds conditionMessage(), which
+  # is usually multi-line here, and a raw newline would split the row.
+  write_tsv(out, file.path(opt$outdir, "batch_summary.tsv"))
   print(out)
   invisible(out)
 }

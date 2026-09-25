@@ -186,3 +186,21 @@ test_that("空 FASTQ 返回空表而不是报错", {
   expect_equal(names(d), c("read_id", "sequence", "quality"))
   expect_equal(count_fastq_reads(fq), 0L)
 })
+
+test_that("write_tsv 不会因为字段内的换行/制表符而写坏文件", {
+  td <- tempfile("nanoamp_tsv_"); dir.create(td)
+  p <- file.path(td, "out.tsv")
+  # fwrite(quote = FALSE) 会把字段原样写出：以前一条带换行的 DECIPHER 消息进了
+  # qc.tsv，行被拆开，fread 只会 "stopped early" 而不报错，等于静默丢数据。
+  write_tsv(
+    data.table::data.table(metric = c("a", "b"),
+                           value = c("one\ntwo", "x\ty")),
+    p
+  )
+  lines <- readLines(p)
+  expect_length(lines, 3L)              # 表头 + 2 行，没有多出来的碎行
+  expect_true(all(grepl("\t", lines)))
+  back <- data.table::fread(p, sep = "\t", header = TRUE)
+  expect_equal(nrow(back), 2L)
+  expect_equal(back$value, c("one two", "x y"))
+})

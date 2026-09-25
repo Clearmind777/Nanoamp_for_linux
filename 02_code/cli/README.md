@@ -72,7 +72,7 @@ Optional column: `ref_label`.
 ### Linux / macOS
 
 ```bash
-sh 02_code/cli/install_cli.sh ~/.local/bin
+sh "$(Rscript --vanilla -e 'cat(system.file("scripts", "install_cli.sh", package = "nanoamp"))')" ~/.local/bin
 export PATH="$HOME/.local/bin:$PATH"
 nanoamp doctor
 ```

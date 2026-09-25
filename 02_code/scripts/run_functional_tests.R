@@ -29,6 +29,27 @@ script_path <- if (length(script_arg)) sub("^--file=", "", script_arg[1]) else N
 start_dir <- if (!is.na(script_path)) dirname(script_path) else getwd()
 project_root <- find_project_root(start_dir)
 
+# 本脚本用的是**已安装**的 nanoamp（library(nanoamp)），不是工作区源码。
+# 一份过期的安装会让这份报告描述另一份代码，所以先把身份和新鲜度说清楚。
+inst_dir <- dirname(system.file(package = "nanoamp"))
+cat(sprintf("nanoamp %s loaded from %s\n",
+            as.character(utils::packageVersion("nanoamp")), inst_dir))
+src_dir <- file.path(project_root, "02_code")
+if (dir.exists(src_dir)) {
+  src_files <- list.files(file.path(src_dir, "R"), pattern = "\\.[Rr]$",
+                          full.names = TRUE)
+  src_newest <- suppressWarnings(max(file.info(src_files)$mtime, na.rm = TRUE))
+  inst_mtime <- file.info(file.path(inst_dir, "DESCRIPTION"))$mtime
+  if (is.finite(src_newest) && !is.na(inst_mtime) && src_newest > inst_mtime) {
+    message(sprintf(
+      paste0("NOTE: the checkout (newest R source %s) is newer than the installed ",
+             "package (%s). Run `make install` first, otherwise these results ",
+             "describe the installed code, not the checkout."),
+      format(src_newest, "%Y-%m-%d %H:%M"), format(inst_mtime, "%Y-%m-%d %H:%M")
+    ))
+  }
+}
+
 `%||%` <- function(x, y) {
   if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
 }
@@ -243,8 +264,11 @@ comp <- merge(
   run_index[, .(dataset, sample, mode, ref_label, elapsed_sec)],
   by = c("dataset", "sample", "mode", "ref_label"), all.x = TRUE
 )
-data.table::fwrite(run_index, file.path(out_root, "run_index.tsv"), sep = "\t", na = "")
-data.table::fwrite(comp, file.path(out_root, "comparison.tsv"), sep = "\t", na = "")
+# nanoamp:::write_tsv() scrubs tabs/newlines out of fields: `error` holds
+# conditionMessage(), which is usually multi-line, and fwrite(quote = FALSE)
+# would write it verbatim and split the row.
+nanoamp:::write_tsv(run_index, file.path(out_root, "run_index.tsv"))
+nanoamp:::write_tsv(comp, file.path(out_root, "comparison.tsv"))
 
 summary_mode <- comp[, .(
   n_runs = .N,
@@ -255,7 +279,7 @@ summary_mode <- comp[, .(
                                         n_overlap / n_company_variants_ge5, NA_real_), na.rm = TRUE), 4),
   mean_elapsed_sec = round(mean(elapsed_sec, na.rm = TRUE), 2)
 ), by = mode]
-data.table::fwrite(summary_mode, file.path(out_root, "summary_by_mode.tsv"), sep = "\t", na = "")
+nanoamp:::write_tsv(summary_mode, file.path(out_root, "summary_by_mode.tsv"))
 
 cat("\n功能测试完成\n")
 print(summary_mode)

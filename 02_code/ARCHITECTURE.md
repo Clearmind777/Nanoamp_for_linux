@@ -12,7 +12,7 @@ repository-level helper scripts, which are excluded from the built tarball via
 |-- R/                      # nanoamp R package sources
 |-- tests/testthat/         # unit tests
 |-- man/                    # generated help
-|-- exec/nanoamp            # package CLI wrapper (installed as bin/nanoamp)
+|-- exec/nanoamp            # package CLI wrapper (installed as <pkg>/exec/nanoamp)
 |-- inst/
 |   |-- docs/               # dependency installation guides
 |   `-- scripts/            # CLI entry point + CLI installer shipped with the package

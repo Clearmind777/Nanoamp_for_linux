@@ -59,7 +59,25 @@ cluster_sequences <- function(seqs, identity_cutoff = 0.99, threads = 4L,
     ans <- tryCatch({
       x <- Biostrings::DNAStringSet(toupper(seqs))
       names(x) <- sprintf("r%06d", seq_len(n))
-      d <- DECIPHER::DistanceMatrix(x, processors = threads, verbose = FALSE)
+      # DECIPHER warns when the sequences differ in length ("using shorter
+      # length in each comparison"), which is the normal case for nanopore
+      # reads. Capture it instead of letting it surface as one R warning per
+      # Mode B run: it is reported once as a note and recorded in qc.tsv, and
+      # a batch of runs no longer ends with "There were 50 or more warnings".
+      distance_note <- NA_character_
+      d <- withCallingHandlers(
+        DECIPHER::DistanceMatrix(x, processors = threads, verbose = FALSE),
+        warning = function(w) {
+          # Collapse to one line: the message arrives wrapped in newlines, and
+          # this value is written into qc.tsv, where a raw newline would split
+          # the row and silently corrupt the file.
+          distance_note <<- gsub("\\s+", " ", trimws(conditionMessage(w)))
+          invokeRestart("muffleWarning")
+        }
+      )
+      if (!is.na(distance_note)) {
+        log_info("clustering: ", distance_note)
+      }
       dm <- as.matrix(d)
       exports <- getNamespaceExports("DECIPHER")
       if ("Clusterize" %in% exports) {
@@ -88,7 +106,8 @@ cluster_sequences <- function(seqs, identity_cutoff = 0.99, threads = 4L,
         clv <- clv[names(x)]
         method <- "DECIPHER::DistanceMatrix+hclust"
       }
-      list(cluster = unname(clv), distance = dm, method = method)
+      list(cluster = unname(clv), distance = dm, method = method,
+           note = distance_note)
     }, error = function(e) {
       log_warn("DECIPHER clustering failed; falling back to greedy clustering: ",
                conditionMessage(e))
@@ -287,6 +306,10 @@ run_mode_b <- function(reads_path, reference_path, outdir,
     mean_coverage = round(sum(kept$ref_span) / ref$length, 4),
     identity_cutoff = identity_cutoff,
     clustering_method = cl$method,
+    # Set when DECIPHER reported something about the distance computation
+    # (e.g. that the reads differ in length). Kept so the caveat survives the
+    # run instead of living only in console output.
+    clustering_note = cl$note %||% NA_character_,
     consensus_method = consensus_method,
     decipher_version = if (requireNamespace("DECIPHER", quietly = TRUE)) {
       as.character(utils::packageVersion("DECIPHER"))

@@ -2,6 +2,12 @@
 
 所有实现（R 核心库、CLI）都应在 `--outdir` 下生成以下文件，字段名保持一致。
 
+**TSV 的硬性保证**：每个文件的每一条记录占且仅占一行，字段数恒等于表头字段数。
+`write_tsv()` 会把字段内部的制表符与换行折叠成空格（并保留 `NA`）——`fwrite(quote =
+FALSE)` 否则会把这些字符原样写出，把一行拆成两行。这类损坏是静默的：下游
+`fread()` 只会 "Stopped early on line N" 而**不报错**，等于悄悄丢数据。写新的
+TSV 输出时请一律走 `write_tsv()`，不要直接调 `fwrite`。
+
 ## haplotypes.tsv
 
 方案 A / B：

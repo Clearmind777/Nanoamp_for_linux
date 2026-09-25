@@ -19,6 +19,20 @@ test_that("abbreviated long flags are rejected with the real flag suggested", {
   expect_error(cli_check_flags(c("--anno", "cfg.json"), opts), "Abbreviations are not accepted")
 })
 
+test_that("legacy flags that are not prefixes of anything are explained too", {
+  opts <- cli_call_options()
+
+  # These have no implemented flag they could abbreviate, so before the fix
+  # they fell through to optparse's bare "long flag ... is invalid" and the
+  # explanatory text in cli_legacy_flag_hint() was unreachable.
+  expect_error(cli_check_flags(c("--annotation-route", "cds"), opts),
+               "There is no --annotation-route")
+  expect_error(cli_check_flags(c("--ensembl-release", "116"), opts),
+               "Not implemented in v0.1.0")
+  expect_error(cli_check_flags(c("--annotation-route", "cds"), opts),
+               "See --help for the implemented options")
+})
+
 test_that("exact flags, including --help and the values of other flags, pass", {
   opts <- cli_call_options()
 

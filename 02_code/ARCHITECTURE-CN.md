@@ -10,7 +10,7 @@
 |-- R/                      # nanoamp R 包源码
 |-- tests/testthat/         # 单元测试
 |-- man/                    # 生成的帮助文档
-|-- exec/nanoamp            # 包内 CLI 包装（安装后为 bin/nanoamp）
+|-- exec/nanoamp            # 包内 CLI 包装（安装后为 <pkg>/exec/nanoamp）
 |-- inst/
 |   |-- docs/               # 依赖安装教程
 |   `-- scripts/            # 随包发布的 CLI 入口与安装脚本
