@@ -24,7 +24,9 @@ run_haplotype_analysis(
   use_samtools = FALSE,
   threads = 4L,
   keep_intermediates = TRUE,
-  ref_label = NULL
+  ref_label = NULL,
+  annotation = NULL,
+  list_transcripts = FALSE
 )
 }
 \arguments{
@@ -70,6 +72,13 @@ Rsamtools. Rsamtools is recommended and is used by default.}
 \item{keep_intermediates}{Keep BAM and other intermediate files.}
 
 \item{ref_label}{Optional reference label used in outputs.}
+
+\item{annotation}{Optional annotation config path (JSON). When supplied, a
+functional annotation pass runs and writes `annotation.tsv`. See
+`00_materials/optional_function.md`.}
+
+\item{list_transcripts}{When TRUE only the candidate transcript table is
+printed and no analysis is run.}
 }
 \value{
 A list with `haplotypes`, `variants` and `qc` elements.

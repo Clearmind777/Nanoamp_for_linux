@@ -13,5 +13,10 @@ report the top sequences with counts and proportions.
 \author{
 \strong{Maintainer}: nanoamp developers \email{nanoamp@example.com}
 
+Authors:
+\itemize{
+  \item nanoamp developers \email{nanoamp@example.com}
+}
+
 }
 \keyword{internal}

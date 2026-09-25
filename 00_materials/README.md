@@ -16,7 +16,8 @@ Planning documents and work reports for the nanoamp project.
     |-- work_report.7.md       # Linux repo reduced to the CLI-only distribution
     |-- work_report.8.md       # ln_test_data removed, 02_code flattened, macOS arm64 verified
     |-- work_report.9.md       # minimap2 bundled for 4 platforms, samtools dropped, pak-first R deps
-    `-- work_report.10.md      # linux cross-fetch fixed, ShortRead replaced by a base-R FASTQ reader
+    |-- work_report.10.md      # linux cross-fetch fixed, ShortRead replaced by a base-R FASTQ reader
+    `-- work_report.11.md      # functional annotation: online Ensembl reference, bilingual consequences
 ```
 
 Start with `programs_dev_info.md` for the original request and

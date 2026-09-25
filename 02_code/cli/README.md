@@ -32,6 +32,25 @@ nanoamp help
 | `--threads` | int | 4 | Number of threads |
 | `--ref-label` | string | reference name | Reference label in outputs |
 | `--no-intermediates` | flag | false | Do not keep BAM files |
+| `--annotate-config` | path | none | Enable functional annotation with this JSON config |
+| `--transcript` | string | none | Transcript id to annotate, or `all` for every overlapping transcript |
+| `--list-transcripts` | flag | false | Print the candidate transcripts for the amplicon |
+| `--annotation-proteins` | flag | false | Include reference/alternate protein sequences in `annotation.tsv` (planned) |
+| `--clear-cache` | flag | false | Clear the annotation reference cache and exit |
+| `--no-cache` | flag | false | Ignore cached reference slices and re-fetch them |
+| `--cache-dir` | path | `$XDG_CACHE_HOME/nanoamp/ref` | Cache location |
+| `--ensembl-release` | int | latest | Pin the Ensembl release used for annotation |
+
+### Annotation notes
+
+Annotation is the only part of the CLI that uses the network. It fetches the
+transcript structure and sequence slices it needs from Ensembl REST, caches them,
+and **fails with a non-zero exit code** when the providers are unreachable --
+it never silently returns unannotated results. The `cds` route
+(`cds.start` / `cds.end` in the config) works entirely offline.
+
+See the "Functional annotation" section of the root README for the consequence
+vocabulary and the self-checks that run on every annotation pass.
 
 ## batch input
 

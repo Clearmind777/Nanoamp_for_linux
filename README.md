@@ -9,6 +9,12 @@ This repository is the command-line distribution of `nanoamp`. It ships the
 four supported platforms** (Linux and macOS, x86_64 and arm64). A graphical
 interface is not part of this repository.
 
+It can also classify what each sequence difference means biologically
+(**frameshift / premature stop / missense / synonymous**, plus UTR, intron and
+splice-region effects). That needs transcript structure, which the program
+fetches **online on demand** -- you do not prepare any GTF or genome FASTA.
+See [Functional annotation](#functional-annotation).
+
 ## Installation
 
 The alignment tool needs no installation: `03_dependence/<os>-<arch>/bin/minimap2`
@@ -103,6 +109,94 @@ sh 02_code/cli/nanoamp call \
 
 See `02_code/README.md` for the analysis modes, all parameters, the output
 schema and the R API; `02_code/ARCHITECTURE.md` for the directory layout.
+
+## Functional annotation
+
+`--annotate-config` turns on a functional annotation pass. It writes
+`annotation.tsv` next to the usual outputs and adds consequence columns to
+`qc.tsv`; without the flag nothing changes.
+
+```bash
+# What transcripts overlap this amplicon? (no annotation config needed)
+sh 02_code/cli/nanoamp call \
+  --reads sample.fastq --reference amplicon.fa --outdir out \
+  --list-transcripts
+
+# Annotate against the MANE Select transcript
+sh 02_code/cli/nanoamp call \
+  --reads sample.fastq --reference amplicon.fa --outdir out \
+  --annotate-config 02_code/configs/example_online.json
+
+# ...or against every overlapping transcript
+sh 02_code/cli/nanoamp call ... --annotate-config cfg.json --transcript all
+```
+
+### Where the reference comes from
+
+There is nothing to download by hand. The program locates the amplicon in
+GRCh38 itself and takes transcript structure from the Ensembl REST API (the
+GENCODE/Ensembl identifier system, so ids stay in the `ENST`/`ENSG` namespace).
+Only the slices it needs are fetched -- a few kB per amplicon -- and they are
+cached under the XDG cache directory:
+
+```text
+${XDG_CACHE_HOME:-~/.cache}/nanoamp/ref/
+```
+
+`--clear-cache` empties it, `--no-cache` re-fetches, `--cache-dir` relocates it.
+The Ensembl release used is recorded in `run_manifest.json`, and
+`--ensembl-release N` pins a specific one when a reproducible reference matters.
+
+### Two routes, one pipeline
+
+| Route | When | Needs |
+|---|---|---|
+| `genome` (default) | normal use: the program finds the amplicon and the transcript | internet |
+| `cds` | the amplicon reference is not a plain GRCh38 fragment, or the machine is offline | nothing: give `cds.start` / `cds.end` on the amplicon |
+
+Route `cds` is the offline fallback -- it only needs translation, so it works
+air-gapped (`02_code/configs/example_cds.json`).
+
+### Consequence vocabulary
+
+Consequences are reported with an English enum and a Chinese label
+(`consequence_en` / `consequence_zh`), so downstream code can filter on a stable
+value while the table stays readable:
+
+| English | 中文 |
+|---|---|
+| `frameshift` | 移码 |
+| `stop_gained` | 提前终止 |
+| `stop_lost` | 终止丢失 |
+| `start_lost` | 起始丢失 |
+| `inframe_insertion` / `inframe_deletion` | 整码插入 / 整码缺失 |
+| `missense` | 错义 |
+| `synonymous` | 同义 |
+| `splice_region` | 剪接区 |
+| `5_prime_UTR` / `3_prime_UTR` | 5'UTR / 3'UTR |
+| `intron` | 内含子 |
+| `outside_cds` | CDS 之外 |
+
+Each haplotype also gets `consequence_any_transcript` (the most severe
+consequence across the selected transcripts) and `transcript_conflict`, which
+flags a haplotype whose consequence differs between transcripts -- the clearest
+warning that the transcript choice matters.
+
+### What is verified
+
+Every run re-checks the frame before reporting anything:
+
+1. **V1** -- the CDS we assemble is translated and compared against the protein
+   Ensembl serves; a mismatch aborts the run instead of producing consequences
+   built on a wrong reading frame.
+2. **V2** -- CDS length, start codon, stop codon and block layout.
+3. **V3** -- the amplicon's position is derived from an exact-match anchor and
+   the coordinates are re-derived from it, so a partially matching reference
+   cannot silently shift every coordinate.
+
+If the providers are unreachable the run **fails with an error and a non-zero
+exit code**; it never quietly returns results without the annotation you asked
+for.
 
 ## Repository layout
 

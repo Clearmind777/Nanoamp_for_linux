@@ -174,7 +174,8 @@ run_mode_b <- function(reads_path, reference_path, outdir,
                        max_msa_seqs = 100L, consensus_method = "decipher",
                        aligner = c("minimap2", "r"), use_samtools = FALSE,
                        threads = 4L, keep_intermediates = TRUE,
-                       ref_label = NULL) {
+                       ref_label = NULL, annotation = NULL,
+                       list_transcripts = FALSE) {
   aligner <- match.arg(aligner, c("minimap2", "r"))
   outdir <- ensure_dir(outdir)
   ref <- read_reference(reference_path)
@@ -296,16 +297,22 @@ run_mode_b <- function(reads_path, reference_path, outdir,
     top1_proportion = round(clusters$proportion[1], 6),
     top1_is_reference = clusters$is_reference[1]
   )
+  ann <- annotation_pass(annotation, ref, clusters, NULL, outdir,
+                         list_only = list_transcripts,
+                         haplotype_id_col = "cluster_id")
+  if (isTRUE(ann$available)) qc <- c(qc, ann$qc)
   write_tsv(build_qc_table(qc), file.path(outdir, "qc.tsv"))
   run_manifest(outdir, "B", list(
     top_n = top_n, identity_cutoff = identity_cutoff,
     min_cluster_reads = min_cluster_reads, min_identity = min_identity,
     min_ref_coverage = min_ref_coverage, max_msa_seqs = max_msa_seqs,
     consensus_method = consensus_method, aligner = aligner, threads = threads
-  ), ref, qc, extra = list(reads_md5 = safe_md5(reads_path)))
+  ), ref, qc, extra = c(list(reads_md5 = safe_md5(reads_path)),
+                        if (isTRUE(ann$available)) list(annotation = ann$manifest)))
 
   if (!isTRUE(keep_intermediates) && !is.null(prep$bam)) {
     unlink(c(prep$bam, paste0(prep$bam, ".bai"), paste0(prep$bam, ".minimap2.log")))
   }
-  invisible(list(haplotypes = clusters, variants = var_rows, qc = qc))
+  invisible(list(haplotypes = clusters, variants = var_rows, qc = qc,
+                 annotation = ann$table))
 }

@@ -45,7 +45,19 @@ cli_call_options <- function() {
     optparse::make_option(c("--ref-label"), type = "character", default = NULL,
                           help = "Reference label used in outputs"),
     optparse::make_option(c("--no-intermediates"), action = "store_true", default = FALSE,
-                          help = "Do not keep BAM and other intermediate files")
+                          help = "Do not keep BAM and other intermediate files"),
+    optparse::make_option(c("--annotate-config"), type = "character", default = NULL,
+                          help = "Functional annotation config (JSON); enables annotation"),
+    optparse::make_option(c("--transcript"), type = "character", default = NULL,
+                          help = "Transcript id to annotate, or 'all' for every overlapping transcript"),
+    optparse::make_option(c("--list-transcripts"), action = "store_true", default = FALSE,
+                          help = "List candidate transcripts for the amplicon and exit"),
+    optparse::make_option(c("--clear-cache"), action = "store_true", default = FALSE,
+                          help = "Clear the annotation reference cache and exit"),
+    optparse::make_option(c("--no-cache"), action = "store_true", default = FALSE,
+                          help = "Ignore cached reference slices and re-fetch them"),
+    optparse::make_option(c("--annotation-proteins"), action = "store_true", default = FALSE,
+                          help = "Include reference and alternate protein sequences in annotation.tsv")
   )
 }
 
@@ -63,7 +75,13 @@ cli_batch_options <- function() {
     optparse::make_option(c("--min-cluster-reads"), type = "integer", default = 2),
     optparse::make_option(c("--consensus-method"), type = "character", default = "decipher"),
     optparse::make_option(c("--aligner"), type = "character", default = "minimap2"),
-    optparse::make_option(c("--no-intermediates"), action = "store_true", default = FALSE)
+    optparse::make_option(c("--no-intermediates"), action = "store_true", default = FALSE),
+    optparse::make_option(c("--annotate-config"), type = "character", default = NULL),
+    optparse::make_option(c("--transcript"), type = "character", default = NULL),
+    optparse::make_option(c("--list-transcripts"), action = "store_true", default = FALSE),
+    optparse::make_option(c("--clear-cache"), action = "store_true", default = FALSE),
+    optparse::make_option(c("--no-cache"), action = "store_true", default = FALSE),
+    optparse::make_option(c("--annotation-proteins"), action = "store_true", default = FALSE)
   )
 }
 
@@ -75,6 +93,13 @@ cli_cmd_call <- function(args) {
     cli_usage()
     stop("call requires --reads, --reference and --outdir", call. = FALSE)
   }
+  if (isTRUE(opt$`clear-cache`)) {
+    d <- annotation_cache_clear()
+    cat("Cleared annotation cache:", d, "\n")
+    return(invisible(TRUE))
+  }
+  if (isTRUE(opt$`no-cache`)) annotation_cache_clear()
+  config_path <- cli_annotation_config(opt, opt$outdir)
   run_haplotype_analysis(
     reads = opt$reads, reference = opt$reference, outdir = opt$outdir,
     mode = opt$mode, top_n = opt$`top-n`,
@@ -86,7 +111,9 @@ cli_cmd_call <- function(args) {
     aligner = opt$aligner,
     threads = opt$threads,
     keep_intermediates = !isTRUE(opt$`no-intermediates`),
-    ref_label = opt$`ref-label`
+    ref_label = opt$`ref-label`,
+    annotation = config_path,
+    list_transcripts = isTRUE(opt$`list-transcripts`)
   )
   invisible(TRUE)
 }
@@ -193,4 +220,43 @@ nanoamp_cli <- function(args = commandArgs(trailingOnly = TRUE)) {
     cli_usage()
   )
   invisible(NULL)
+}
+
+# Resolve the annotation config path for a CLI call.
+#
+# * --annotate-config gives the path directly; --transcript / --list-transcripts
+#   are folded into a copy of that config so the user can override the
+#   transcript without editing the file.
+# * --list-transcripts with no config still needs a context, so a throwaway
+#   genome-route config is written to a temporary file: the point of the flag is
+#   to discover which transcripts exist before deciding anything.
+cli_annotation_config <- function(opt, outdir) {
+  list_only <- isTRUE(opt$`list-transcripts`)
+  cfg_path <- opt$`annotate-config`
+  transcript <- opt$transcript
+
+  if (is.null(cfg_path) || !nzchar(cfg_path)) {
+    if (!list_only) return(NULL)
+    tmp <- tempfile("nanoamp_annot_", fileext = ".json")
+    write_json(
+      list(name = "list-transcripts", route = "genome", genetic_code = "Standard"),
+      tmp
+    )
+    cfg_path <- tmp
+  } else if (!file.exists(cfg_path)) {
+    stop(sprintf("Annotation config not found: %s", cfg_path), call. = FALSE)
+  }
+
+  if (is.null(transcript) || !nzchar(transcript)) return(cfg_path)
+  cfg <- jsonlite::fromJSON(cfg_path, simplifyVector = FALSE)
+  if (identical(tolower(transcript), "all")) {
+    cfg$transcript_all <- TRUE
+    cfg$transcript_id <- NULL
+  } else {
+    cfg$transcript_id <- transcript
+    cfg$transcript_all <- FALSE
+  }
+  tmp <- tempfile("nanoamp_annot_", fileext = ".json")
+  write_json(cfg, tmp)
+  tmp
 }

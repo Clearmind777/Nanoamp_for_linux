@@ -7,6 +7,10 @@
 以及**为四个平台全部预置好的 `minimap2`**（Linux 与 macOS，x86_64 与 arm64）。
 本仓库不包含图形界面。
 
+它还能把每条序列差异翻译成生物学结论（**移码 / 提前终止 / missense / 同义**，
+以及 UTR、内含子、剪接区等）。这需要转录本结构，程序会**联网按需获取**——
+你不需要准备任何 GTF 或基因组 FASTA。详见[功能注释](#功能注释)。
+
 ## 安装
 
 比对程序不需要安装：`03_dependence/<os>-<arch>/bin/minimap2` 已在仓库内，刚克隆
@@ -93,6 +97,81 @@ sh 02_code/cli/nanoamp call \
 
 分析模式、全部参数、输出字段和 R 接口见 `02_code/README-CN.md`；
 目录结构见 `02_code/ARCHITECTURE-CN.md`。
+
+## 功能注释
+
+加 `--annotate-config` 即启用功能注释：在常规输出旁写出 `annotation.tsv`，并给 `qc.tsv`
+追加后果统计列。不加该参数则一切与现在完全一致。
+
+```bash
+# 这个扩增子落在哪些转录本上？（不需要注释配置）
+sh 02_code/cli/nanoamp call \
+  --reads sample.fastq --reference amplicon.fa --outdir out \
+  --list-transcripts
+
+# 按 MANE Select 转录本注释
+sh 02_code/cli/nanoamp call \
+  --reads sample.fastq --reference amplicon.fa --outdir out \
+  --annotate-config 02_code/configs/example_online.json
+
+# ……或注释全部重叠转录本
+sh 02_code/cli/nanoamp call ... --annotate-config cfg.json --transcript all
+```
+
+### 参考信息从哪来
+
+**不需要手工下载任何文件。** 程序自己在 GRCh38 上定位扩增子，并从 Ensembl REST API
+获取转录本结构（GENCODE/Ensembl 编号体系，ID 保持 `ENST`/`ENSG`）。只取所需切片
+（每个扩增子几 KB），并缓存到 XDG 缓存目录：
+
+```text
+${XDG_CACHE_HOME:-~/.cache}/nanoamp/ref/
+```
+
+`--clear-cache` 清空，`--no-cache` 强制重取，`--cache-dir` 改位置。所用 Ensembl
+release 会记入 `run_manifest.json`；需要固定参考版本时用 `--ensembl-release N`。
+
+### 两条路线，同一套管线
+
+| 路线 | 适用 | 依赖 |
+|---|---|---|
+| `genome`（默认） | 常规使用：程序自行定位扩增子与转录本 | 需要联网 |
+| `cds` | 扩增子参考不是纯 GRCh38 片段，或机器离线 | **什么都不需要**：自己给 `cds.start` / `cds.end` |
+
+`cds` 路线是离线后备路径：只做翻译，**完全不需要网络**
+（示例见 `02_code/configs/example_cds.json`）。
+
+### 后果词表（中英双列）
+
+后果同时给出英文枚举与中文标签（`consequence_en` / `consequence_zh`）：
+下游代码可按稳定的英文值筛选，表格本身保持可读。
+
+| 英文 | 中文 |
+|---|---|
+| `frameshift` | 移码 |
+| `stop_gained` | 提前终止 |
+| `stop_lost` | 终止丢失 |
+| `start_lost` | 起始丢失 |
+| `inframe_insertion` / `inframe_deletion` | 整码插入 / 整码缺失 |
+| `missense` | 错义 |
+| `synonymous` | 同义 |
+| `splice_region` | 剪接区 |
+| `5_prime_UTR` / `3_prime_UTR` | 5'UTR / 3'UTR |
+| `intron` | 内含子 |
+| `outside_cds` | CDS 之外 |
+
+每个单倍型另给 `consequence_any_transcript`（所选转录本中最严重的后果）与
+`transcript_conflict`（同一变异在不同转录本下后果不同）——后者是"转录本选错"最直观的报警。
+
+### 每次运行都会自检
+
+1. **V1** —— 把我们拼出的 CDS 翻译后与 Ensembl 提供的官方蛋白对拍；不一致就**中止**，
+   而不是在错误阅读框上继续输出后果；
+2. **V2** —— CDS 长度、起始密码子、终止密码子与块布局；
+3. **V3** —— 扩增子位置由**精确匹配锚点**推导，坐标由锚点反推，因此"部分匹配的参考"
+   不会悄悄让所有坐标偏移。
+
+若参考服务不可达，程序**直接报错并以非零状态退出**，绝不会静默地返回一份没有注释的结果。
 
 ## 仓库结构
 

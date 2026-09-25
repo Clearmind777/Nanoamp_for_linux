@@ -89,3 +89,59 @@ params
 qc
 reads_md5
 ```
+
+## annotation.tsv（功能注释，可选）
+
+仅当传入 `--annotate-config` 时生成。每个**单倍型 × 所选转录本**一行；
+`--transcript all` 时包含全部重叠转录本。
+
+| 列名 | 类型 | 说明 |
+|---|---|---|
+| `rank` | int | 行序号（按 reads 数降序） |
+| `haplotype_id` | string | 关联 `haplotypes.tsv` |
+| `count` / `proportion` | int / float | 从 `haplotypes.tsv` 带过来，便于直接阅读 |
+| `transcript_id` / `transcript_name` | string | 所用转录本 |
+| `is_mane` / `is_canonical` | bool | 该转录本是否 MANE Select / Ensembl canonical |
+| `cds_ok` | bool | FALSE 表示边界或序列异常，后续列为空 |
+| `ref_protein_length` / `alt_protein_length` | int | 参考/突变蛋白长度（aa） |
+| `n_aa_changed` | int | 氨基酸改变数 |
+| `protein_change` | string | HGVS 风格描述（**非合规 HGVS**），如 `p.Lys2Glu`、`p.Phe3fs`、`p.Lys2del` |
+| `consequence_en` / `consequence_zh` | string | 后果英文枚举与中文标签（中英双列） |
+| `consequence_any_transcript` / `_zh` | string | 该单倍型在所选转录本中**最严重**的后果 |
+| `transcript_conflict` | bool | 同一单倍型在不同转录本下后果不同 |
+| `variants` / `signature` | string | 与 `haplotypes.tsv` 一致 |
+| `notes` | string | 异常说明，例如 `length change +14 bp (not a multiple of 3)` |
+
+### 后果枚举（`consequence_en`）
+
+```text
+frameshift  stop_gained  stop_lost  start_lost
+inframe_insertion  inframe_deletion  missense  synonymous
+splice_region  5_prime_UTR  3_prime_UTR  intron  outside_cds
+cds_boundary_disrupted  cds_ambiguous_base  no_variant
+```
+
+### qc.tsv 注释相关指标
+
+```text
+annotation_enabled  annotation_name  annotation_route  annotation_source
+ensembl_release  genetic_code  n_transcripts
+n_haplotypes_annotated  n_haplotypes_skipped
+n_frameshift  n_stop_gained  n_stop_lost  n_start_lost
+n_missense  n_synonymous  n_inframe  n_transcript_conflicts
+```
+
+### run_manifest.json 的 annotation 段
+
+```json
+"annotation": {
+  "enabled": true,
+  "source": "ensembl-rest",
+  "ensembl_release": "116",
+  "config_path": "...", "config": { },
+  "genomic": { "chrom": "19", "start": 0, "end": 0, "strand": "+",
+                "identity": 1.0, "n_mismatch": 0, "method": "exact_match" },
+  "transcripts": [ { "transcript_id": "ENST...", "cds_length": 0,
+                     "protein_length": 0, "protein_verified": true } ]
+}
+```

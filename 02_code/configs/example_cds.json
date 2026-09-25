@@ -1,0 +1,7 @@
+{
+  "name": "example_cds_route",
+  "route": "cds",
+  "cds": { "start": 55, "end": 320, "strand": "+", "frame": 0, "boundaries": "inclusive" },
+  "genetic_code": "Standard",
+  "notes": "Offline fallback: give the CDS start/end on the amplicon reference. Needs no network and no reference files."
+}

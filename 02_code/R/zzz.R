@@ -8,7 +8,12 @@ utils::globalVariables(c(
   "rank", "ref", "ref_fwd", "ref_rev", "region_key", "sample_read_id",
   "Seq", "signature", "start", "support", "type",
   "cs", "DP4", "flag", "haplotype_id", "is_reference", "nm", "read_id",
-  "ref_cov", "ref_end", "ref_span", "ref_start", "strand", "variants"
+  "ref_cov", "ref_end", "ref_span", "ref_start", "strand", "variants",
+  # annotation (R/annotate.R, R/annotate_config.R)
+  "cds_overlap_bp", "transcript_id", "transcript_name", "is_mane", "is_canonical",
+  "genome_pos", "cds_pos", "consequence_en", "consequence_any_transcript",
+  "consequence_any_transcript_zh", "transcript_conflict", "anchor_coverage",
+  "protein_id", "bp", "label", "chrom", "alt_protein", "ref_protein"
 ))
 
 # ---------------------------------------------------------------------------
