@@ -1,6 +1,6 @@
 R_PKG := 02_code
 
-.PHONY: help install deps-r test check cli deps deps-all test-data functional-test clean-builds
+.PHONY: help install deps-r test check cli deps deps-all test-data functional-test clean-builds release release-publish release-check
 
 help:
 	@echo "nanoamp project targets:"
@@ -13,6 +13,9 @@ help:
 	@echo "  make test-data    Regenerate 01_data/manifest.tsv from 01_data/test_data"
 	@echo "  make functional-test Run all datasets x modes (needs R deps + minimap2)"
 	@echo "  make clean-builds Remove 05_builds/r contents"
+	@echo "  make release      Build all release/ artifacts from the current tag/commit"
+	@echo "  make release-check Verify release/ checksums and metadata (no publishing)"
+	@echo "  make release-publish Publish release/ to GitHub (needs gh auth or GH_TOKEN)"
 
 install:
 	R CMD INSTALL $(R_PKG)
@@ -51,3 +54,16 @@ functional-test:
 
 clean-builds:
 	rm -rf 05_builds/r/*
+
+# --- 发布 -------------------------------------------------------------------
+# 从当前 tag（没有 tag 则用 HEAD）构建 release/ 下的全部产物，并重写 manifest.tsv。
+release:
+	bash 02_code/scripts/mk-release.sh --ref "$$(git describe --tags --exact-match 2>/dev/null || echo HEAD)"
+
+# 只做校验：校验和 + 元数据 + 发布前置条件，不发布。
+release-check:
+	DRY_RUN=1 bash release/publish_github_release.sh
+
+# 需要 gh auth login 或 GH_TOKEN；脚本幂等，Release 已存在时覆盖同名附件。
+release-publish:
+	bash release/publish_github_release.sh

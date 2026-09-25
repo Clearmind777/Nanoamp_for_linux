@@ -39,3 +39,10 @@ tmp/
 # R build artifacts
 *.Rcheck/
 nanoamp_*.tar.gz
+
+# Release artifacts: 大体积归档通过 GitHub Release 分发，不入 git。
+# 只跟踪 release/ 下的文档与脚本（README.md / RELEASE_NOTES*.md /
+# manifest.tsv / SHA256SUMS / publish_*.sh）。
+release/*.tar.gz
+release/*.zip
+release/archive/

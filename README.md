@@ -1,5 +1,7 @@
 # nanoamp
 
+**中文** | [English](README-EN.md)
+
 `nanoamp` 用于分析纳米孔 PCR 产物的测序数据。给定 FASTQ 和目的序列，它会校正
 测序错误、重建单倍型，并输出数量最多、比例最高的序列。
 
@@ -195,7 +197,12 @@ release 会记入 `run_manifest.json`；需要固定参考版本时用 `--ensemb
 03_dependence/   为四个平台预置的 minimap2 与各平台说明
 04_results/      运行结果（除 README 外不进 Git）
 05_builds/       R CMD build / check 产物
+release/         发布产物与说明（大体积归档不进 Git，见 release/README.md）
 ```
+
+发布：`make release` 从当前 tag 构建 `release/` 下的全部产物，
+`make release-check` 只校验，`make release-publish` 推送到 GitHub Release
+（需要 `gh auth login` 或 `GH_TOKEN`）。当前版本见 `release/RELEASE_NOTES.md`。
 
 ## 开发平台
 

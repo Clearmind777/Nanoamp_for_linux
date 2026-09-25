@@ -50,3 +50,10 @@ NAMESPACE       text eol=lf
 # instead of relying on auto-detection (which can be confused by the ELF/Mach-O
 # headers and would otherwise try to normalise line endings).
 03_dependence/*/bin/*   binary
+
+# `git archive` ignores .gitignore but honours export-ignore. Release archives are
+# built with `git archive`, so without these rules each new release would swallow
+# the previous release's tarballs (release/ is gitignored, not export-ignored) and
+# the archive would grow without bound. Keep release artifacts out; the metadata
+# files are reproduced from the tag anyway.
+release/        export-ignore

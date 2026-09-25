@@ -1,0 +1,45 @@
+# nanoamp release manifest
+# 每行: key<TAB>value ; 以 # 开头为注释
+# 本文件由 02_code/scripts/mk-release.sh 生成，请勿手工编辑尺寸/校验和字段。
+release	0.1.0
+tag	v0.1.0
+git_commit	7422af9223f05e060bbb6cbf0fe367d8126b0e3a
+git_commit_short	7422af9
+build_date_utc	2026-09-25T12:41:33Z
+build_host	Darwin arm64, R version 4.5.3 (2026-03-11) -- "Reassured Reassurer"
+build_tree	git archive HEAD (含未纳入 git 的 01_data/test_data 复现数据)
+
+file	nanoamp-0.1.0-src.tar.gz
+size_bytes	69961887
+sha256	60fc2c543e5b42bf075346435385b706bf9dbf66da972f9c46baab56f402142a
+role	完整仓库源码归档（tar.gz），含 01_data/test_data，可复现论文级结果
+unpack	tar xzf nanoamp-0.1.0-src.tar.gz && cd nanoamp-0.1.0
+
+file	nanoamp-0.1.0-src.zip
+size_bytes	69983098
+sha256	5da9b79f553d3f9414e00c53bb6eea29de5f69a362090138bfd24245ec7b54bc
+role	同上的 ZIP 版本，便于图形界面解压
+unpack	unzip nanoamp-0.1.0-src.zip && cd nanoamp-0.1.0
+
+file	nanoamp-0.1.0-R-package.tar.gz
+size_bytes	72232
+sha256	b7b9687978ec60872c68978ba01d92da3069d03defa264bf41752e7af3e18b9e
+role	标准 R 包源码包（R CMD build 02_code 产出），用于 R CMD INSTALL
+r_cmd_check	Status: OK (--no-manual --no-build-vignettes)
+unpack	R CMD INSTALL nanoamp-0.1.0-R-package.tar.gz
+
+# 已验证工具链（本 release 通过 R CMD check 与功能测试的环境）
+toolchain	R version 4.5.3 (2026-03-11) -- "Reassured Reassurer"
+toolchain	Biostrings 2.78.0
+toolchain	pwalign 1.6.0
+toolchain	DECIPHER 3.6.0
+toolchain	data.table 1.18.6.1
+toolchain	Rsamtools 2.26.0
+toolchain	jsonlite 2.0.0
+toolchain	minimap2 2.31-r1302 (随包提供 linux-x86_64 / linux-arm64 / macos-x86_64 / macos-arm64)
+
+# 外部数据源（仅联网注释路线使用）
+annotation_source	Ensembl REST
+annotation_release	116
+annotation_panel	ZNF8 (ENSG00000278129 / ENST00000621650, 575 aa)
+annotation_sequence_source	UCSC (序列); 结构注释仅用 Ensembl/GENCODE 体系

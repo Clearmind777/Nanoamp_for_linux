@@ -18,7 +18,8 @@ Planning documents and work reports for the nanoamp project.
     |-- work_report.9.md       # minimap2 bundled for 4 platforms, samtools dropped, pak-first R deps
     |-- work_report.10.md      # linux cross-fetch fixed, ShortRead replaced by a base-R FASTQ reader
     |-- work_report.11.md      # functional annotation: online Ensembl reference, bilingual consequences
-    `-- work_report.12.md      # annotation follow-up: minus strand, variant detail, Mode B verified
+    |-- work_report.12.md      # annotation follow-up: minus strand, variant detail, Mode B verified
+    `-- work_report.13.md      # README/structure audit, code review fixes, v0.1.0 release
 ```
 
 Start with `programs_dev_info.md` for the original request and
@@ -38,4 +39,6 @@ records the switch from a single Linux x86_64 bundled binary to a bundled
 `minimap2` for all four supported platforms, and the removal of the bundled
 `samtools`. Report 10 fixes cross-fetching linux-64 from macOS and replaces the
 `ShortRead` FASTQ reader with a base-R parser, which is what finally makes the
-default workflow independent of `pwalign`.
+default workflow independent of `pwalign`. Report 11 adds the functional
+annotation module, report 12 follows it up, and report 13 audits the READMEs and
+the tree and prepares the first release (`release/`, tag `v0.1.0`).

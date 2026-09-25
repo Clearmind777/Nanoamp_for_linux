@@ -1,5 +1,7 @@
 # nanoamp
 
+[中文](README.md) | **English**
+
 `nanoamp` analyzes Oxford Nanopore reads from PCR amplicons. Given a FASTQ file
 and a target sequence, it corrects sequencing errors, reconstructs haplotypes,
 and reports the most abundant sequences with counts and proportions.
@@ -220,7 +222,13 @@ for.
 03_dependence/   pre-bundled minimap2 for 4 platforms + platform notes
 04_results/      run outputs (ignored by Git except its README)
 05_builds/       R CMD build / check artifacts
+release/         release artifacts and notes (large archives stay out of Git;
+                 see release/README.md)
 ```
+
+Releasing: `make release` builds everything under `release/` from the current tag,
+`make release-check` only verifies, and `make release-publish` uploads to the
+GitHub Release (needs `gh auth login` or `GH_TOKEN`). See `release/RELEASE_NOTES.md`.
 
 ## Development platforms
 
