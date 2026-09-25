@@ -81,6 +81,20 @@ fi
 # --- 4. 选择发布通道: gh CLI 优先，否则 REST API ----------------------------
 TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
 
+# gh 常常装在 PATH 之外（Homebrew 的 /opt/homebrew/bin 在非登录 shell 里可能缺失），
+# 所以显式补上常见位置。
+for d in /opt/homebrew/bin /usr/local/bin "$HOME/.local/bin"; do
+  [[ -x "$d/gh" ]] && case ":$PATH:" in *":$d:"*) ;; *) PATH="$d:$PATH";; esac
+done
+export PATH
+export GH_PROMPT_DISABLED=1     # 无人交互：gh 不要弹提示，直接失败
+
+# gh 是否可用且已登录（失败会自动走下面的 token/报错分支）
+gh_ready() {
+  command -v gh >/dev/null 2>&1 || return 1
+  gh auth status >/dev/null 2>&1
+}
+
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
   info "DRY_RUN: 校验通过，未发布。"
   printf '   tag        : %s\n' "$TAG"
@@ -88,20 +102,23 @@ if [[ "${DRY_RUN:-0}" == "1" ]]; then
   printf "   附件       : %s\n" "${ASSETS[*]##*/}"
   if [[ -n "$TOKEN" ]]; then
     printf '   凭据       : 已提供 token（将走 REST API）\n'
-  elif command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  elif gh_ready; then
     printf '   凭据       : gh CLI 已登录\n'
+  elif command -v gh >/dev/null 2>&1; then
+    printf '   凭据       : gh 已安装但未登录（需要 gh auth login）\n'
   else
     printf '   凭据       : 缺失（需要 gh auth login 或 GH_TOKEN）\n'
   fi
   exit 0
 fi
 
-if [[ -z "$TOKEN" ]] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+if [[ -z "$TOKEN" ]] && gh_ready; then
   info "使用 gh CLI 发布"
   EXTRA=()
   [[ "${DRAFT:-0}" == "1" ]] && EXTRA+=(--draft)
   [[ "${PRERELEASE:-0}" == "1" ]] && EXTRA+=(--prerelease)
-
+  # 注意：bash 3.2 下空数组配 `set -u` 会报 unbound variable，因此统一用
+  # `${EXTRA[@]+"${EXTRA[@]}"}` 这种“有元素才展开”的写法。
   if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
     info "Release $TAG 已存在，改为上传/覆盖附件"
     gh release upload "$TAG" "${ASSETS[@]}" --repo "$REPO" --clobber
@@ -110,7 +127,7 @@ if [[ -z "$TOKEN" ]] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/nu
       --repo "$REPO" \
       --title "nanoamp $VERSION" \
       --notes-file "$NOTES_FILE" \
-      "${EXTRA[@]}"
+      ${EXTRA[@]+"${EXTRA[@]}"}
   fi
   info "完成: https://github.com/$REPO/releases/tag/$TAG"
   exit 0
