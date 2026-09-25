@@ -152,6 +152,82 @@ Mode C counts raw reads that match the reference exactly on either strand. It
 is useful for demonstrating the effect of nanopore errors, but it is not
 recommended for quantitative haplotype analysis.
 
+## Functional annotation
+
+Annotation answers what a sequence difference *means*: frameshift, premature
+stop, missense, synonymous, plus UTR / intron / splice-region effects. It is
+optional and driven by a JSON config; without `--annotate-config` nothing in the
+output changes.
+
+```r
+library(nanoamp)
+res <- run_haplotype_analysis(
+  reads = "sample.fastq", reference = "amplicon.fa", outdir = "out",
+  annotation = "02_code/configs/example_online.json"
+)
+res$annotation   # one row per haplotype x transcript
+```
+
+### Where the reference comes from
+
+Nothing has to be downloaded by hand. The program locates the amplicon in GRCh38
+itself and takes transcript structure from the Ensembl REST API, so identifiers
+stay in the GENCODE/Ensembl namespace (`ENST`/`ENSG`). Only the slices it needs
+are fetched -- a few kB per amplicon -- and they are cached under
+`${XDG_CACHE_HOME:-~/.cache}/nanoamp/ref`. The Ensembl release is recorded in
+`run_manifest.json`.
+
+| Route | When | Needs |
+|---|---|---|
+| `genome` (default) | normal use | internet |
+| `cds` | reference is not a plain GRCh38 fragment, or the host is offline | nothing: give `cds.start` / `cds.end` on the amplicon |
+
+### Selecting transcripts
+
+The consequence of a variant can differ between transcripts, so the transcript is
+never chosen silently. The default is the MANE Select transcript, then Ensembl
+canonical; if neither exists the run stops and prints the candidates. Select
+explicitly with `transcript_id` in the config, or annotate all of them:
+
+```r
+# transcript_all / transcript_id live in the JSON config
+run_haplotype_analysis(..., annotation = "configs/all_transcripts.json")
+
+# from the CLI the same choice is a flag
+#   nanoamp call ... --annotate-config cfg.json --transcript all
+#   nanoamp call ... --annotate-config cfg.json --transcript ENST00000621650
+```
+
+Every haplotype row carries `consequence_any_transcript` (the most severe
+consequence across the selected transcripts) and `transcript_conflict`, which is
+set when a haplotype's consequence differs between transcripts.
+
+### Consequence vocabulary
+
+Consequences are reported in two columns, so downstream code can filter on a
+stable value while the table stays readable:
+
+`consequence_en` / `consequence_zh`: `frameshift` / 移码, `stop_gained` /
+提前终止, `stop_lost` / 终止丢失, `start_lost` / 起始丢失, `inframe_insertion` /
+整码插入, `inframe_deletion` / 整码缺失, `missense` / 错义, `synonymous` / 同义,
+`splice_region` / 剪接区, `5_prime_UTR` / 5'UTR, `3_prime_UTR` / 3'UTR,
+`intron` / 内含子, `outside_cds` / CDS 之外.
+
+### Self-checks
+
+Every annotation pass verifies its own frame before reporting anything:
+
+1. **V1** -- the assembled CDS is translated and compared against the protein
+   Ensembl serves; a mismatch aborts the run instead of emitting consequences
+   built on a wrong reading frame.
+2. **V2** -- CDS length, start codon, stop codon and block layout.
+3. **V3** -- the amplicon position is derived from an exact-match anchor and the
+   coordinates are re-derived from it.
+
+Annotation is the only networked part of the package. When the providers are
+unreachable it **fails with an error**; it never silently returns results without
+the annotation that was requested. Route `cds` works air-gapped.
+
 ## Parameters
 
 Default parameters can be inspected with:
@@ -177,6 +253,10 @@ nanoamp_defaults()
 | `use_samtools` | `FALSE` | Use samtools instead of Rsamtools for SAM to BAM |
 | `threads` | 4 | Number of threads |
 | `keep_intermediates` | `TRUE` | Keep BAM and other intermediate files |
+| `annotation` | `NULL` | Path to a functional annotation config (JSON); `NULL` disables annotation |
+| `list_transcripts` | `FALSE` | Only print the candidate transcripts for the amplicon |
+| `annotation_proteins` | `FALSE` | Include reference/alternate protein sequences in `annotation.tsv` |
+| `annotation_detail` | `FALSE` | Also write `variants_annotation.tsv` with per-variant consequences |
 
 ## Output files
 
@@ -188,6 +268,8 @@ outdir/
 |-- qc.tsv
 |-- run_manifest.json
 `-- alignments.bam(.bai)     # Modes A and B, when keep_intermediates = TRUE
+`-- annotation.tsv           # only when annotation is enabled
+`-- variants_annotation.tsv  # only with annotation_detail = TRUE
 ```
 
 ### haplotypes.tsv
@@ -370,6 +452,10 @@ The package has been verified with `R CMD check` and currently passes with
 | `DECIPHER` not installed | Mode B falls back to greedy clustering; install DECIPHER for better results |
 | `pairwiseAlignment` is not an exported object from Biostrings | Only `aligner = "r"` and the Mode B annotation need pairwise alignment. Bioconductor >= 3.19 moved it to `pwalign`; install it with `BiocManager::install("pwalign")`. The default minimap2 workflow is unaffected |
 | All proportions are low in Mode C | Nanopore reads contain errors; use Mode A |
+| `Cannot annotate: the reference providers are not reachable` | Annotation needs Ensembl. Check network/proxy, retry with `--no-cache`, or use a `cds` config, which needs no network |
+| `the amplicon reference matches ... only over N% of its length` | The reference is not a plain GRCh38 fragment (plasmid, chimeric or heavily edited). Use a `cds` config with explicit `cds.start` / `cds.end` |
+| `no transcript selected and this locus has no MANE_Select` | Set `transcript_id` in the config, or `transcript_all = TRUE` |
+| Annotation is slow | Each transcript costs a few requests and they are throttled; annotate a single transcript, and reruns hit the cache |
 
 ## License
 

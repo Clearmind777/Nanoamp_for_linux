@@ -346,9 +346,26 @@ annotation_verify_reference_protein <- function(structure, genetic_code, retries
   if (is.null(ops) || nrow(ops) == 0) return(seq)
   ops <- data.table::as.data.table(ops)
   ops <- ops[order(pos, match(type, c("snv", "del", "ins")))]
+  # Malformed operations mean the coordinate mapping upstream is wrong, so
+  # report rather than append or truncate silently.
+  L <- nchar(seq)
+  bad <- which(ops$pos > L & as.character(ops$type) != "ins")
+  if (length(bad) > 0) {
+    stop(sprintf(
+      "annotation: operation position %d is past the end of the %d bp frame",
+      ops$pos[bad[1]], L
+    ), call. = FALSE)
+  }
+  over <- which(as.character(ops$type) %in% c("del", "delregion") &
+                  (ops$pos + nchar(ops$ref) - 1L) > L)
+  if (length(over) > 0) {
+    stop(sprintf(
+      "annotation: deletion at %d spans past the end of the %d bp frame",
+      ops$pos[over[1]], L
+    ), call. = FALSE)
+  }
   out <- character(0)
   cursor <- 1L
-  L <- nchar(seq)
   for (i in seq_len(nrow(ops))) {
     p <- as.integer(ops$pos[i])
     type <- ops$type[i]
@@ -438,18 +455,20 @@ annotation_cds_frame <- function(structure, genomic, ops) {
     within <- data.table::copy(within)
     within[, cds_pos := vapply(genome_pos, function(gp) {
       for (i in seq_len(nrow(blocks))) {
-        if (strand > 0 && gp >= blocks$start[i] && gp < blocks$end[i]) {
-          return(sum(blocks$end[seq_len(i - 1L)] - blocks$start[seq_len(i - 1L)] + 1L) +
-                   (gp - blocks$start[i]) + 1L)
+        # A block always satisfies start <= end on the forward strand, so the
+        # containment test is identical for both strands. (An earlier version
+        # tested gp <= start && gp >= end for the minus strand, which is never
+        # true and silently dropped every variant on that strand.)
+        if (gp < blocks$start[i] || gp > blocks$end[i]) next
+        before <- if (i > 1L) {
+          sum(blocks$end[seq_len(i - 1L)] - blocks$start[seq_len(i - 1L)] + 1L)
+        } else {
+          0L
         }
-        if (strand > 0 && gp == blocks$end[i]) {
-          return(sum(blocks$end[seq_len(i - 1L)] - blocks$start[seq_len(i - 1L)] + 1L) +
-                   (gp - blocks$start[i]) + 1L)
-        }
-        if (strand < 0 && gp <= blocks$start[i] && gp >= blocks$end[i]) {
-          return(sum(blocks$start[seq_len(i - 1L)] - blocks$end[seq_len(i - 1L)] + 1L) +
-                   (blocks$start[i] - gp) + 1L)
-        }
+        # blocks are already in transcript order: ascending on the plus strand,
+        # descending on the minus strand
+        offset <- if (strand > 0) gp - blocks$start[i] else blocks$end[i] - gp
+        return(as.integer(before + offset + 1L))
       }
       NA_integer_
     }, integer(1))]
@@ -532,6 +551,14 @@ annotation_haplotype_transcript <- function(hap_seq, structure, genomic, ops,
     n_aa_changed = NA_integer_, ref_protein_length = NA_integer_,
     alt_protein_length = NA_integer_, notes = NA_character_
   )
+  if (nchar(ref_cds) == 0L) {
+    empty$notes <- "reference CDS is empty"
+    return(empty)
+  }
+  if (nchar(ref_cds) %% 3L != 0L) {
+    empty$notes <- sprintf("reference CDS length %d is not a multiple of 3", nchar(ref_cds))
+    return(empty)
+  }
   if (!isTRUE(ref_tr$ok)) {
     empty$notes <- ref_tr$problem
     return(empty)

@@ -8,9 +8,11 @@ README.
 |-- r/                        # R package / CLI test runs
 |   |-- test_run_3/            # Linux x86_64 functional test (historical)
 |   |-- test_run_macos_arm64/  # macOS arm64, conda-provided minimap2 (report 8)
-|   `-- test_run_bundled/      # macOS arm64, pre-bundled minimap2 (report 9)
+|   |-- test_run_bundled/      # macOS arm64, pre-bundled minimap2 (report 9)
+|   `-- round2/                # macOS arm64, latest regression run (reports 11-12)
 |-- cli/                       # CLI smoke examples
 `-- _archive/                  # older runs kept locally for reference
+    `-- r/                     # 39 earlier runs from the verification rounds
 ```
 
 Conventions:
@@ -45,3 +47,8 @@ pre-bundled binary; the numbers agree, which is the point of keeping both:
 | C | 56 | 56 | 0.1231 | 0.0000 | 0.11 s |
 
 Reproduce with `make functional-test` (writes to `04_results/r/test_run_local/`).
+
+`round2` is the most recent full regression run: 168/168 runs `ok`, with Mode A
+`0.6750` / `0.9807` and Mode C `0.1231` matching the established baseline.
+Annotation runs were used during development and live in
+`_archive/r/`; they are not part of the canonical regression.

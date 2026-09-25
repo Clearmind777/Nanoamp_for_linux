@@ -73,8 +73,13 @@ export PATH="$HOME/.local/bin:$PATH"
 nanoamp doctor
 ```
 
-The installed R package also ships an equivalent script at
-`system.file("scripts", "install_cli.sh", package = "nanoamp")`.
+This installs the wrapper that calls the **installed** package. The repository
+also ships a development launcher at `02_code/cli/nanoamp`, which runs straight
+from a checkout (it loads `02_code/` with pkgload) and needs no installation.
+
+There is no separate repo-level installer: use this one, or call the launcher
+directly. Installing the wrapper from the repository sources would bake a
+checkout path into `~/.local/bin`, which breaks as soon as the checkout moves.
 
 ## Outputs
 

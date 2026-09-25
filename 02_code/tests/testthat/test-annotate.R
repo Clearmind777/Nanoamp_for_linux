@@ -352,6 +352,83 @@ test_that("minus-strand frames mirror the plus-strand result", {
   expect_equal(minus$protein_change, plus$protein_change)
 })
 
+test_that("minus-strand cds_pos maps inside multi-block transcripts", {
+  # Regression test: the minus-strand branch used to compare
+  # gp <= start && gp >= end, which is never true, so every variant on that
+  # strand was silently dropped from the translation.
+  cds <- "ATGAAATTTGGGCCCTAA"          # 18 bp, 6 codons
+  two <- paste0(cds, cds)              # 36 bp over two blocks
+  blocks <- data.table::data.table(chrom = "S", start = c(101L, 201L),
+                                   end = c(118L, 218L), strand = -1L,
+                                   phase = c(0L, 0L), protein_id = "P")
+  st <- list(transcript_id = "P", exons = blocks, cds = blocks, cds_seq = two,
+             ok = TRUE, problem = NA_character_, chrom = "S", strand = -1L)
+  g <- list(chrom = "S", start = 101L, end = 218L, strand = "-")
+  cds_of <- function(gp) {
+    annotation_cds_frame(st, g, data.table::data.table(
+      type = "snv", pos = gp, ref = "A", alt = "G", genome_pos = gp))$ops_in_cds$cds_pos
+  }
+  # on the minus strand the transcript starts at the highest coordinate, so the
+  # 5' base of the transcript is the end of the upper block
+  expect_equal(cds_of(218L), 1L)
+  expect_equal(cds_of(201L), 18L)
+  expect_equal(cds_of(118L), 19L)
+  expect_equal(cds_of(101L), 36L)
+  # a position inside the intron between the blocks is not in the CDS
+  expect_true(is.na(cds_of(150L)))
+})
+
+test_that("a multi-block minus-strand frame mirrors the plus-strand frame", {
+  set.seed(11)
+  cds <- paste0("ATG", paste0(sample(c("A", "C", "G", "T"), 60, TRUE), collapse = ""), "TAA")
+  block1 <- substr(cds, 1, 33)
+  block2 <- substr(cds, 34, 66)
+  rc <- function(x) as.character(Biostrings::reverseComplement(Biostrings::DNAStringSet(x)))
+
+  # plus strand: two blocks left to right, the transcript start is the lower one
+  b_plus <- data.table::data.table(chrom = "S", start = c(101L, 201L),
+                                   end = c(133L, 233L), strand = 1L,
+                                   phase = c(0L, 0L), protein_id = "P")
+  st_plus <- list(transcript_id = "P", exons = b_plus, cds = b_plus,
+                  cds_seq = paste0(block1, block2), ok = TRUE,
+                  problem = NA_character_, chrom = "S", strand = 1L)
+  plus_frame <- list(chrom = "S", start = 101L, end = 233L, strand = "+")
+
+  # minus strand: the same CDS laid out right to left
+  b_minus <- data.table::data.table(chrom = "S", start = c(101L, 201L),
+                                    end = c(133L, 233L), strand = -1L,
+                                    phase = c(0L, 0L), protein_id = "P")
+  st_minus <- list(transcript_id = "P", exons = b_minus, cds = b_minus,
+                   cds_seq = paste0(block1, block2), ok = TRUE,
+                   problem = NA_character_, chrom = "S", strand = -1L)
+  minus_frame <- list(chrom = "S", start = 101L, end = 233L, strand = "-")
+
+  # a substitution at transcript CDS position 5 (inside block 1) -> missense
+  plus_gp <- 101L + 4L                       # block1[5]
+  expect_equal(substr(block1, 5, 5), substr(cds, 5, 5))
+  ops_plus <- data.table::data.table(
+    type = "snv", pos = plus_gp - plus_frame$start + 1L,
+    ref = substr(cds, 5, 5), alt = setdiff(c("A", "C", "G", "T"), substr(cds, 5, 5))[1])
+  gp <- annotation_variants_to_genomic(ops_plus, plus_frame)
+  expect_equal(gp$genome_pos, plus_gp)
+  plus <- annotation_haplotype_transcript(NULL, st_plus, plus_frame, gp,
+                                          Biostrings::GENETIC_CODE)
+
+  # the same change on the minus strand: block2 carries the 5' part, so CDS
+  # position 5 is 4 bases into block2 counting down from its end
+  minus_gp <- 233L - 4L
+  ops_minus <- data.table::data.table(
+    type = "snv", pos = minus_frame$end - minus_gp + 1L,
+    ref = rc(substr(cds, 5, 5)), alt = rc(gp$alt))
+  gm <- annotation_variants_to_genomic(ops_minus, minus_frame)
+  expect_equal(gm$genome_pos, minus_gp)
+  minus <- annotation_haplotype_transcript(NULL, st_minus, minus_frame, gm,
+                                           Biostrings::GENETIC_CODE)
+
+  expect_false(is.na(minus$consequence))
+  expect_equal(nchar(minus$ref_protein), nchar(plus$ref_protein))
+})
+
 test_that("minus-strand insertions are anchored one base further", {
   # An insertion sits between pos-1 and pos in the amplicon's own orientation,
   # which on the minus strand is the base after the insertion point.
@@ -402,5 +479,42 @@ test_that("variant-level consequences cover the rule table", {
   expect_equal(
     annotation_variant_consequence("ins", 104L, "", "A", st, Biostrings::GENETIC_CODE, 1L, 300L),
     "frameshift"
+  )
+})
+
+test_that("degenerate frames are refused instead of reported as synonymous", {
+  mk <- function(cds) {
+    b <- data.table::data.table(chrom = "S", start = 1L, end = max(1L, nchar(cds)),
+                                strand = 1L, phase = 0L, protein_id = "P")
+    list(transcript_id = "x", exons = b, cds = b, cds_seq = cds, ok = TRUE,
+         problem = NA_character_, chrom = "S", strand = 1L)
+  }
+  g <- list(start = 1L, end = 10L, strand = "+")
+  no_ops <- data.table::data.table(type = character(0), pos = integer(0),
+                                   ref = character(0), alt = character(0),
+                                   genome_pos = integer(0))
+  # an empty CDS must not come back as a synonymous haplotype
+  r <- annotation_haplotype_transcript("", mk(""), g, no_ops, Biostrings::GENETIC_CODE)
+  expect_false(r$cds_ok)
+  expect_true(is.na(r$consequence))
+  expect_match(r$notes, "empty")
+  # a frame whose length is not a multiple of three must be reported too
+  r2 <- annotation_haplotype_transcript("", mk("ATGAA"), g, no_ops, Biostrings::GENETIC_CODE)
+  expect_false(r2$cds_ok)
+  expect_match(r2$notes, "multiple of 3")
+})
+
+test_that("malformed operations are reported, not silently applied", {
+  # A position past the end means the coordinate mapping upstream is wrong.
+  expect_error(
+    nanoamp:::.annotation_apply_ops("ACGT", data.table::data.table(
+      type = "snv", pos = 99L, ref = "A", alt = "G")),
+    "past the end"
+  )
+  # A deletion running off the end is malformed too.
+  expect_error(
+    nanoamp:::.annotation_apply_ops("ACGT", data.table::data.table(
+      type = "del", pos = 2L, ref = "GGGG", alt = "")),
+    "spans past the end"
   )
 })

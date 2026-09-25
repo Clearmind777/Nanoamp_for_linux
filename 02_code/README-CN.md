@@ -136,6 +136,66 @@ res$qc           # 质控指标
 统计原始 reads 与参考正链或反向互补链完全一致的条数。它主要用于展示
 纳米孔测序错误的影响，不推荐用于定量。
 
+## 功能注释
+
+注释回答的是"序列差异**意味着什么**"：移码、提前终止、missense、同义，以及 UTR / 内含子 /
+剪接区效应。它是可选功能，由 JSON 配置驱动；不传 `--annotate-config` 时输出完全不变。
+
+```r
+library(nanoamp)
+res <- run_haplotype_analysis(
+  reads = "sample.fastq", reference = "amplicon.fa", outdir = "out",
+  annotation = "02_code/configs/example_online.json"
+)
+res$annotation   # 每个单倍型 × 每个转录本一行
+```
+
+### 参考信息从哪来
+
+**不需要手工下载任何文件。** 程序自己在 GRCh38 上定位扩增子，从 Ensembl REST API 获取
+转录本结构，ID 保持 GENCODE/Ensembl 体系（`ENST`/`ENSG`）。只取所需切片（每个扩增子几 KB），
+缓存于 `${XDG_CACHE_HOME:-~/.cache}/nanoamp/ref`。所用 Ensembl release 记入 `run_manifest.json`。
+
+| 路线 | 适用 | 依赖 |
+|---|---|---|
+| `genome`（默认） | 常规使用 | 需要联网 |
+| `cds` | 参考不是纯 GRCh38 片段，或机器离线 | **什么都不需要**：自己给 `cds.start` / `cds.end` |
+
+### 选择转录本
+
+同一变异的后果可能因转录本而异，因此程序**绝不静默选一个**。默认取 MANE Select，其次
+Ensembl canonical；两者都不存在时**停止并打印候选清单**。可在配置里用 `transcript_id`
+指定，或注释全部：
+
+```r
+# transcript_all / transcript_id 写在 JSON 配置里
+run_haplotype_analysis(..., annotation = "configs/all_transcripts.json")
+
+# 命令行等价写法
+#   nanoamp call ... --annotate-config cfg.json --transcript all
+#   nanoamp call ... --annotate-config cfg.json --transcript ENST00000621650
+```
+
+每个单倍型还带 `consequence_any_transcript`（所选转录本中最严重的后果）与
+`transcript_conflict`（同一单倍型在不同转录本下后果不同）。
+
+### 后果词表（中英双列）
+
+`consequence_en` / `consequence_zh`：`frameshift` / 移码、`stop_gained` / 提前终止、
+`stop_lost` / 终止丢失、`start_lost` / 起始丢失、`inframe_insertion` / 整码插入、
+`inframe_deletion` / 整码缺失、`missense` / 错义、`synonymous` / 同义、
+`splice_region` / 剪接区、`5_prime_UTR` / 5'UTR、`3_prime_UTR` / 3'UTR、
+`intron` / 内含子、`outside_cds` / CDS 之外。
+
+### 每次运行的自检
+
+1. **V1** —— 拼出的 CDS 翻译后与 Ensembl 官方蛋白对拍；不一致就**中止**，不在错误阅读框上输出后果；
+2. **V2** —— CDS 长度、起始密码子、终止密码子与块布局；
+3. **V3** —— 扩增子位置由精确匹配锚点推导，坐标由锚点反推。
+
+注释是本包**唯一联网**的部分。参考服务不可达时**直接报错**，绝不静默返回无注释的结果；
+`cds` 路线完全离线可用。
+
 ## 参数
 
 查看默认参数：
@@ -161,6 +221,10 @@ nanoamp_defaults()
 | `use_samtools` | `FALSE` | 是否用 samtools 替代 Rsamtools 完成 SAM→BAM |
 | `threads` | 4 | 线程数 |
 | `keep_intermediates` | `TRUE` | 是否保留 BAM 等中间文件 |
+| `annotation` | `NULL` | 功能注释配置文件（JSON）路径；`NULL` 表示不启用 |
+| `list_transcripts` | `FALSE` | 只打印该扩增子的候选转录本 |
+| `annotation_proteins` | `FALSE` | 在 `annotation.tsv` 中附加参考/突变蛋白序列 |
+| `annotation_detail` | `FALSE` | 另写 `variants_annotation.tsv`（变异级明细） |
 
 ## 输出文件
 
@@ -345,6 +409,10 @@ Rscript 02_code/scripts/run_functional_tests.R \
 | 没有安装 `DECIPHER` | 方案 B 会自动降级为贪心聚类；建议安装 DECIPHER |
 | 报错 `pairwiseAlignment` is not an exported object from Biostrings | 只有 `aligner = "r"` 和方案 B 标注需要成对比对。Bioconductor >= 3.19 已把它移到 `pwalign`，用 `BiocManager::install("pwalign")` 安装即可；默认的 minimap2 流程不受影响 |
 | 方案 C 比例很低 | 纳米孔 reads 有错误，请用方案 A |
+| `Cannot annotate: the reference providers are not reachable` | 注释需要 Ensembl：检查网络/代理、用 `--no-cache` 重试，或改用 `cds` 配置（不需要网络） |
+| `the amplicon reference matches ... only over N% of its length` | 参考不是纯 GRCh38 片段（质粒/嵌合/编辑较多）：改用 `cds` 配置显式给出 `cds.start` / `cds.end` |
+| `no transcript selected and this locus has no MANE_Select` | 在配置里设 `transcript_id`，或 `transcript_all = TRUE` |
+| 注释较慢 | 每个转录本需数次请求且有节流；请只注释单个转录本，重跑会命中缓存 |
 
 ## 许可证
 
