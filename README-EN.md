@@ -112,6 +112,189 @@ sh 02_code/cli/nanoamp call \
 See `02_code/README.md` for the analysis modes, all parameters, the output
 schema and the R API; `02_code/ARCHITECTURE.md` for the directory layout.
 
+## Input data requirements
+
+This section is a **contract**, not advice: prepare your data as described here and
+the program will not fail on format or naming; deviate and the error message names
+the requirement you broke. Every statement below matches what the code does.
+
+### 1. The minimum you must provide
+
+| # | Required | What | Notes |
+|---|---|---|---|
+| 1 | ✅ | **One FASTQ file** | All reads for the sample, unaligned and uncorrected (or QC-filtered) |
+| 2 | ✅ | **One reference sequence (FASTA)** | The amplicon itself, **not a whole genome** |
+| 3 | ✅ | **One output directory path** | Passed as `--outdir`; created if missing |
+
+That is all. No GTF, no genome FASTA, no BAM, no variant table, no annotation
+file — the transcript structure needed for functional annotation is fetched over
+the network (see [Functional annotation](#functional-annotation)).
+
+All three modes take the same inputs; only the algorithm differs:
+
+| Mode | Reference needed? | Notes |
+|---|---|---|
+| **A** (reference-guided, default) | Yes | Recommended; gives exact variant coordinates on the amplicon |
+| **B** (de novo clustering) | Still required as an argument | Used only for labels and coverage; clustering does not depend on it |
+| **C** (exact matching) | Yes | Counts raw reads only; **functional annotation does not run** |
+
+### 2. How to name the files
+
+**The program does not parse file names.** It reads whatever content you pass to
+`--reads` / `--reference`, so any legal file name works (non-ASCII included) and
+no naming rule can make a run fail.
+
+Naming only serves human and script traceability. It is still strongly recommended
+to give the reads and the reference of one sample the **same prefix** and
+distinguish them with a fixed suffix:
+
+```text
+<sample>_<batch>_<date>-<batch-no>-<barcode>-<well>.fastq   # reads
+<sample>_<batch>_<date>-<batch-no>-<barcode>-<well>.1.seq   # reference (amplicon)
+```
+
+This is exactly how the test data in this repository is named:
+
+```text
+E4-3_TSM20260826-020-01254_20260827-020-BAN05-5_H08.fastq   ← --reads
+E4-3_TSM20260826-020-01254_20260827-020-BAN05-5_H08.1.seq   ← --reference
+```
+
+`01_data/manifest.tsv` is an **internal** table mapping short logical names
+(dataset/sample/role) onto those real file names. It is a convenience for the test
+scripts; **you do not need to provide one.**
+
+### 3. FASTQ requirements
+
+`.fastq` and `.fq` are accepted, as are the gzip-compressed `.fastq.gz` / `.fq.gz`.
+Compression is decided by the **magic bytes (`1f 8b`)**: for a name that does not end
+in `.gz` the program probes the magic itself, and for a `.gz` name R's `gzfile()`
+decides the same way. Either way you never have to decompress by hand or rename the
+file to `.gz`.
+
+Required:
+
+| Requirement | What happens otherwise |
+|---|---|
+| **Exactly 4 lines per record**: `@` header, sequence, `+` separator, quality | `Malformed FASTQ (N lines is not a multiple of 4)`, non-zero exit |
+| Line 1 starts with `@` and line 3 with `+` | `Malformed FASTQ (expected a '@' header and a '+' separator ...)`, non-zero exit |
+| One sequence line per record | Same as above — **line-wrapped sequences are not supported** |
+| Non-empty file | `Mode A: no aligned reads`, non-zero exit |
+
+About the quality string (line 4):
+
+- It **must be present**, but its **content is never used**. The program does not
+  filter on quality, does not weight by quality and reports no quality metric;
+  alignment and deconvolution use the sequence only.
+- It therefore **does not have to match the sequence length**; a placeholder such
+  as `IIII...` runs fine.
+
+About the sequence itself:
+
+- Case-insensitive (upper-cased on read).
+- `N` and other ambiguous bases are allowed; positions with `N` count as mismatches.
+- No hard lower bound on read length, but fragments much shorter than the amplicon
+  are more likely to be filtered out by alignment.
+
+### 4. Reference sequence (FASTA) requirements
+
+| Requirement | Notes / behaviour otherwise |
+|---|---|
+| Must be **FASTA** | `.seq`, `.fa`, `.fasta`, `.fas` all work — parsing is by content, **not by extension** (the test data's references are `.seq`). Content that is not FASTA makes Biostrings fail with a non-zero exit, e.g. `">" expected at beginning of line 1` |
+| **Only the first record is used** | Extra records are **silently ignored**. Make sure the sequence you want is first |
+| At least one non-empty sequence | Empty file: `Reference sequence is empty`, non-zero exit |
+| Must be **the amplicon itself** | A whole genome aligns, but coordinates, functional annotation and product length become meaningless |
+| Should be close to the real PCR product length | The reference length is written to `qc.tsv` as `reference_length` and drives coverage, so a mismatch shows up directly in `mean_coverage` |
+
+The reference sets the **origin of every coordinate** in the outputs: positions in
+`variants.tsv`, the alignment basis of `haplotypes.fasta`, and the CDS coordinates
+used by functional annotation are all relative to the sequence you pass. **Changing
+the reference invalidates the coordinates**, especially the JSON config of the `cds`
+route.
+
+### 5. Output directory and naming
+
+The directory given to `--outdir` is created if it does not exist. Each run writes a
+fixed set of files into it (`haplotypes.tsv`, `haplotypes.fasta`, `variants.tsv`,
+`qc.tsv`, `run_manifest.json`, plus `annotation.tsv` when annotation is enabled).
+**Re-running into the same directory overwrites it**, so use one directory per
+sample:
+
+```bash
+--outdir 04_results/r/demo/E4-3
+```
+
+`run_manifest.json` records the `reference` (path, md5, length) and `reads_md5` of the
+run, which is the direct way to check which two inputs a result came from.
+
+### 6. Batch input: the sample sheet (optional)
+
+For many samples, the `batch` subcommand takes a **tab-separated (TSV)** file:
+
+```bash
+sh 02_code/cli/nanoamp batch --sample-sheet samples.tsv --outdir 04_results/batch --mode A
+```
+
+```text
+sample   reads                       reference                   ref_label
+E4-3     data/E4-3_H08.fastq         data/E4-3_H08.1.seq          E4-3 self consensus
+WT       data/WT_B11.fastq           data/WT_B11.1.seq            WT
+clone_3  data/clone_3_F12.fastq      data/WT_B11.1.seq            WT (as reference)
+```
+
+| Column | Required | Meaning |
+|---|---|---|
+| `sample` | ✅ | Sample name; **also the output subdirectory**, so avoid `/` |
+| `reads` | ✅ | FASTQ path (relative to the working directory, or absolute) |
+| `reference` | ✅ | Reference sequence path |
+| `ref_label` | no | Label written to the outputs; defaults to the file name |
+
+The header must contain `sample`, `reads` and `reference`, otherwise the run fails and
+lists the required columns. Each sample is written to `<outdir>/<sample>/`, plus a
+summary.
+
+### 7. Extra requirements for functional annotation (optional)
+
+If you do not pass `--annotate-config`, none of this applies and the outputs are
+byte-identical to a run without annotation.
+
+You supply a JSON config, with **one of two routes**:
+
+- `"route": "genome"` (default, **needs network**): the program locates the amplicon on
+  GRCh38 and pulls Ensembl annotation itself; you provide no annotation files.
+- `"route": "cds"` (**fully offline**): you give the CDS interval in the config.
+
+`cds` coordinates are the easiest thing to get wrong:
+
+| Requirement | Meaning |
+|---|---|
+| Coordinate system | Relative to **the sequence you passed to `--reference`**, **1-based, both ends inclusive** |
+| Length | `end - start + 1` **must be a multiple of 3** |
+| Strand | `"strand": "+"` or `"-"`; for `"-"` the coordinates are still written in the reference's forward numbering |
+| Length not a multiple of 3 | Annotation is **skipped**; the run still exits 0 but `qc.tsv` carries `annotation_available = FALSE` and `annotation_skip_reason`, and `run_manifest.json` carries `annotation.available = false` plus `skipped_transcripts` |
+| Some transcripts skipped out of several | `available` stays `true`, but `qc.tsv`'s `n_transcripts_skipped` and `annotation_skip_reason`, and `run_manifest.json`'s `skipped_transcripts`, record each one and why |
+
+Ready-to-use examples: `02_code/configs/example_online.json` and
+`02_code/configs/example_cds.json` (the latter already filled with the longest ORF of a
+real amplicon). The full field reference is `02_code/configs/README.md`.
+
+### 8. Common input errors and what they mean
+
+| Message | Cause |
+|---|---|
+| `FASTQ file not found: ...` | The `--reads` path does not exist |
+| `Reference sequence not found: ...` | The `--reference` path does not exist |
+| `Malformed FASTQ (N lines is not a multiple of 4)` | A record is not 4 lines, or sequences are wrapped |
+| `Malformed FASTQ (expected a '@' header ...)` | Line 1 is not `@`, line 3 is not `+`, or the file is not FASTQ |
+| `Reference sequence is empty` | The reference file is empty |
+| `Mode A: no aligned reads` | Empty FASTQ, or no read passed `--min-identity` / `--min-ref-coverage` |
+| `sample-sheet must contain columns: ...` | The batch sheet is missing required columns |
+| `Annotation config not found: ...` | Wrong `--annotate-config` path (note: abbreviations such as `--annotate` are not accepted) |
+| `annotation_available = FALSE` in the output | Annotation was requested but produced nothing; the reason is in `annotation_skip_reason` on the same row |
+
+All of these exit with a **non-zero status**; none of them produces a plausible-looking
+half-finished result.
+
 ## Functional annotation
 
 `--annotate-config` turns on a functional annotation pass. It writes

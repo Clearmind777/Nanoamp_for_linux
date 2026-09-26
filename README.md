@@ -100,6 +100,175 @@ sh 02_code/cli/nanoamp call \
 分析模式、全部参数、输出字段和 R 接口见 `02_code/README-CN.md`；
 目录结构见 `02_code/ARCHITECTURE-CN.md`。
 
+## 输入数据要求
+
+本节是**硬性约定**：按这里准备数据，程序不会因为格式或命名问题失败；不按这里准备，
+失败信息会说清楚是哪一项不合规。以下每一条都与代码行为一致，不是建议性描述。
+
+### 1. 最低限度要提供什么
+
+| # | 必需 | 内容 | 说明 |
+|---|---|---|---|
+| 1 | ✅ | **一个 FASTQ 文件** | 该样本的全部 reads，未比对、未纠错的原始或质控后序列 |
+| 2 | ✅ | **一个参考序列文件（FASTA）** | 该扩增子本身的序列，**不是全基因组** |
+| 3 | ✅ | **一个输出目录路径** | 由 `--outdir` 给出；不存在会自动创建 |
+
+就这三项。**不需要**提供 GTF、基因组 FASTA、比对 BAM、变异统计表或任何注释文件——
+功能注释所需的转录本结构由程序联网获取（见[功能注释](#功能注释)）。
+
+三种分析模式对输入的要求完全一样，区别只在算法：
+
+| 模式 | 需要参考序列吗 | 备注 |
+|---|---|---|
+| **A**（参考引导，默认） | 需要 | 推荐；能给出变异在扩增子上的精确坐标 |
+| **B**（de novo 聚类） | 仍然需要传入 | 参考只用于写标签与计算覆盖率，聚类本身不依赖它 |
+| **C**（精确匹配） | 需要 | 只做原始 reads 计数，**不跑功能注释** |
+
+### 2. 数据文件怎么命名
+
+**程序不解析文件名。** 它只按你传给 `--reads` / `--reference` 的路径读取内容，
+因此文件名可以是任何合法的文件名（含中文），不会因为命名不符合某种规则而失败。
+
+命名规则**只用于人和脚本的可追溯性**，不是程序要求。仍然强烈建议：同一个样本的
+reads 与参考序列使用**同一个前缀**，用固定后缀区分，例如：
+
+```text
+<样本名>_<批次>_<日期>-<批次号>-<条码>-<孔位>.fastq   # reads
+<样本名>_<批次>_<日期>-<批次号>-<条码>-<孔位>.1.seq   # 参考序列（扩增子）
+```
+
+这正是本仓库测试数据的命名方式，例如：
+
+```text
+E4-3_TSM20260826-020-01254_20260827-020-BAN05-5_H08.fastq   ← --reads
+E4-3_TSM20260826-020-01254_20260827-020-BAN05-5_H08.1.seq   ← --reference
+```
+
+这样命名之后，`--reads` 与 `--reference` 的关系一眼可辨，批处理表也不容易写错。
+`01_data/manifest.tsv` 是**本仓库内部**用来把「逻辑名（dataset/sample/role）」映射到
+真实文件名的表，属于测试脚本的便利设施，**你不需要提供它**。
+
+### 3. FASTQ 格式要求
+
+接受 `.fastq`、`.fq`，以及 gzip 压缩的 `.fastq.gz` / `.fq.gz`。
+压缩与否按**文件头魔数（`1f 8b`）**判断：扩展名不是 `.gz` 时会先探魔数，
+是 `.gz` 时由 R 的 `gzfile()` 同样按魔数决定是否解压。两种情况下都无需你手动解压，
+也无需把扩展名改成 `.gz`。
+
+必须满足：
+
+| 要求 | 不合规时的行为 |
+|---|---|
+| **每条记录正好 4 行**：`@` 头、序列、`+` 分隔、质量 | `Malformed FASTQ (N lines is not a multiple of 4)` 并**非零退出** |
+| 每第 1 行以 `@` 开头、每第 3 行以 `+` 开头 | `Malformed FASTQ (expected a '@' header and a '+' separator ...)` 并非零退出 |
+| 每条记录的序列必须是**一行** | 同上——**换行折叠的序列不支持** |
+| 文件非空 | `Mode A: no aligned reads` 并非零退出 |
+
+关于质量串（第 4 行）：
+
+- **必须存在**，但**内容不参与任何计算**。程序不按质量过滤、不做质量加权、
+  不输出质量指标；比对与去卷积只用序列。
+- 因此质量串**不要求与序列等长**，用 `IIII…` 之类的占位串也能跑通。
+
+关于序列本身：
+
+- 大小写不敏感（读入后统一转大写）。
+- 允许含 `N` 等简并碱基；含 `N` 的位置按不匹配处理。
+- 单条 read 长度没有硬性下限，但明显短于扩增子的片段更容易被比对过滤掉。
+
+### 4. 参考序列（FASTA）要求
+
+| 要求 | 说明 / 不合规时的行为 |
+|---|---|
+| 必须是 **FASTA** 格式 | 传 `.seq`、`.fa`、`.fasta`、`.fas` 都可以——**按内容解析，不看扩展名**（本仓库测试数据的参考序列就是 `.seq`）。内容不是 FASTA 时 Biostrings 会报错并非零退出，例如 `">" expected at beginning of line 1` |
+| **只取第一条记录** | 文件里有第二条及以上记录时，**静默忽略**（不报错）。请确保要用的序列是第一条 |
+| 至少一条非空序列 | 空文件：`Reference sequence is empty` 并非零退出 |
+| 必须是**该扩增子本身** | 若传全基因组，A 模式能比对但坐标、功能注释与产物长度都会失去意义 |
+| 建议与实测 PCR 产物长度相当 | 参考序列的长度会写进 `qc.tsv` 的 `reference_length` 并参与覆盖率计算，长度明显不符会直接反映在 `mean_coverage` 上 |
+
+参考序列决定**所有输出坐标的原点**：`variants.tsv` 的位置、`haplotypes.fasta` 的
+比对基准，以及功能注释的 CDS 坐标，全部相对于你传入的这条序列。**换参考就要重新确认
+坐标**，尤其是 `cds` 路线的 JSON 配置。
+
+### 5. 输出目录与命名
+
+`--outdir` 指向的目录不存在时会被创建。每次运行会在其下写入固定的一组文件
+（`haplotypes.tsv`、`haplotypes.fasta`、`variants.tsv`、`qc.tsv`、
+`run_manifest.json`；启用注释后另有 `annotation.tsv`）。**同一目录重复运行会被覆盖**，
+因此建议一个样本一个目录：
+
+```bash
+--outdir 04_results/r/demo/E4-3
+```
+
+`run_manifest.json` 记录了本次运行的 `reference`（路径、md5、长度）与 `reads_md5`，
+可以直接用来自查「这次结果对应的是哪两份输入」。
+
+### 6. 批量输入：样本表（可选）
+
+样本多时用 `batch` 子命令，传入一个**制表符分隔（TSV）**文件：
+
+```bash
+sh 02_code/cli/nanoamp batch --sample-sheet samples.tsv --outdir 04_results/batch --mode A
+```
+
+```text
+sample   reads                       reference                   ref_label
+E4-3     data/E4-3_H08.fastq         data/E4-3_H08.1.seq          E4-3 自身共识
+WT       data/WT_B11.fastq           data/WT_B11.1.seq            WT
+clone_3  data/clone_3_F12.fastq      data/WT_B11.1.seq            WT（作为参考）
+```
+
+| 列 | 必需 | 说明 |
+|---|---|---|
+| `sample` | ✅ | 样本名；**同时作为输出子目录名**，因此不要含 `/` |
+| `reads` | ✅ | FASTQ 路径（相对当前工作目录或绝对路径） |
+| `reference` | ✅ | 参考序列路径 |
+| `ref_label` | 否 | 写进输出的参考标签；缺省时用文件名 |
+
+表头必须正好包含 `sample`、`reads`、`reference` 三列，否则报错并列出必需列名。
+每个样本写入 `<outdir>/<sample>/`，另生成一份汇总。
+
+### 7. 功能注释（可选）对输入的额外要求
+
+不传 `--annotate-config` 时本节完全不适用，输出与不启用注释时逐字节一致。
+
+需要另给一个 JSON 配置文件，**二选一**：
+
+- `"route": "genome"`（默认，**需要联网**）：程序自行在 GRCh38 上定位扩增子并取
+  Ensembl 注释，你不需要提供任何注释文件。
+- `"route": "cds"`（**完全离线**）：在配置里直接给出 CDS 区间。
+
+`cds` 路线的坐标要求（最容易出错，务必确认）：
+
+| 要求 | 说明 |
+|---|---|
+| 坐标系 | 相对**你传给 `--reference` 的那条序列**，**1-based、两端闭区间** |
+| 长度 | `end - start + 1` **必须是 3 的倍数** |
+| 链方向 | `"strand": "+"` 或 `"-"`；`"-"` 时坐标仍按参考序列的正向编号写 |
+| 长度不是 3 的倍数时 | 注释**被跳过**，运行仍以退出码 0 结束，但 `qc.tsv` 写入 `annotation_available = FALSE` 与 `annotation_skip_reason`，`run_manifest.json` 写入 `annotation.available = false` 与 `skipped_transcripts` |
+| 多个转录本中部分被跳过时 | `available` 仍为 `true`，但 `qc.tsv` 的 `n_transcripts_skipped` 与 `annotation_skip_reason`、`run_manifest.json` 的 `skipped_transcripts` 会逐条记录 |
+
+可直接使用的例子：`02_code/configs/example_online.json` 与
+`02_code/configs/example_cds.json`（后者已用一个真实扩增子的最长 ORF 填好坐标）。
+字段全集见 `02_code/configs/README.md`。
+
+### 8. 常见的输入错误与对应信息
+
+| 你会看到 | 原因 |
+|---|---|
+| `FASTQ file not found: ...` | `--reads` 路径不存在 |
+| `Reference sequence not found: ...` | `--reference` 路径不存在 |
+| `Malformed FASTQ (N lines is not a multiple of 4)` | 记录不满 4 行，或有折叠的序列 |
+| `Malformed FASTQ (expected a '@' header ...)` | 第 1 行不是 `@`、第 3 行不是 `+`，或文件不是 FASTQ |
+| `Reference sequence is empty` | 参考序列文件是空的 |
+| `Mode A: no aligned reads` | FASTQ 为空，或没有一条 read 通过 `--min-identity` / `--min-ref-coverage` |
+| `sample-sheet must contain columns: ...` | 批处理表缺必需列 |
+| `Annotation config not found: ...` | `--annotate-config` 路径写错（注意：`--annotate` 这类缩写不会被接受） |
+| 输出里 `annotation_available = FALSE` | 注释被请求但未产出；具体原因见同行的 `annotation_skip_reason` |
+
+以上输入类错误都会以**非零退出码**结束，不会产出看似正常的半成品结果。
+
 ## 功能注释
 
 加 `--annotate-config` 即启用功能注释：在常规输出旁写出 `annotation.tsv`，并给 `qc.tsv`
